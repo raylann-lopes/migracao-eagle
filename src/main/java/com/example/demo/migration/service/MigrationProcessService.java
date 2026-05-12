@@ -86,7 +86,7 @@ public class MigrationProcessService {
         process.setMigratorDatabase(migratorDatabase());
         process.setCleanDatabasePath(cleanDatabaseTemplateService.templateReferenceForVersion(request.eagleVersion().trim()));
         process.setDefaultDistrictId(request.config().defaultDistrictId());
-        process.setDefaultCep(request.config().defaultCep().trim());
+        process.setDefaultCep(normalizeBlank(request.config().defaultCep()));
         process.setCompanyState(request.config().companyState().trim().toUpperCase());
         process.setMigrateReceivables(request.config().migrateReceivables());
         process.setStatus(MigrationStatus.CRIADO);
@@ -404,6 +404,13 @@ public class MigrationProcessService {
 
     private String normalizeDocument(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private String normalizeBlank(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private String migratorDatabase() {

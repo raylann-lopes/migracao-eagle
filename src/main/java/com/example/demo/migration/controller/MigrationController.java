@@ -2,13 +2,11 @@ package com.example.demo.migration.controller;
 
 import com.example.demo.migration.controller.dto.CleanDatabaseTemplateResponse;
 import com.example.demo.migration.controller.dto.CreateMigrationProcessRequest;
-import com.example.demo.migration.controller.dto.DistrictResponse;
 import com.example.demo.migration.controller.dto.LayoutResponse;
 import com.example.demo.migration.controller.dto.MigrationProcessResponse;
 import com.example.demo.migration.controller.dto.ProcedureExecutionResponse;
 import com.example.demo.migration.controller.dto.SheetDetailResponse;
 import com.example.demo.migration.domain.MigrationModule;
-import com.example.demo.migration.service.CleanDatabaseDistrictService;
 import com.example.demo.migration.service.CleanDatabaseTemplateService;
 import com.example.demo.migration.service.MigrationLayoutRegistry;
 import com.example.demo.migration.service.MigrationMapper;
@@ -38,19 +36,16 @@ import org.springframework.web.multipart.MultipartFile;
 public class MigrationController {
 
     private final MigrationProcessService processService;
-    private final CleanDatabaseDistrictService cleanDatabaseDistrictService;
     private final CleanDatabaseTemplateService cleanDatabaseTemplateService;
     private final MigrationLayoutRegistry layoutRegistry;
     private final MigrationMapper mapper;
 
     public MigrationController(
             MigrationProcessService processService,
-            CleanDatabaseDistrictService cleanDatabaseDistrictService,
             CleanDatabaseTemplateService cleanDatabaseTemplateService,
             MigrationLayoutRegistry layoutRegistry,
             MigrationMapper mapper) {
         this.processService = processService;
-        this.cleanDatabaseDistrictService = cleanDatabaseDistrictService;
         this.cleanDatabaseTemplateService = cleanDatabaseTemplateService;
         this.layoutRegistry = layoutRegistry;
         this.mapper = mapper;
@@ -133,15 +128,5 @@ public class MigrationController {
     @GetMapping("/clean-database-templates")
     public List<CleanDatabaseTemplateResponse> cleanDatabaseTemplates() {
         return cleanDatabaseTemplateService.list();
-    }
-
-    @GetMapping("/clean-database-templates/{version}/districts")
-    public List<DistrictResponse> districts(@PathVariable String version, @RequestParam("search") String search) {
-        return cleanDatabaseDistrictService.search(version, search);
-    }
-
-    @GetMapping("/clean-database-templates/{version}/districts/{districtId}")
-    public DistrictResponse district(@PathVariable String version, @PathVariable Integer districtId) {
-        return cleanDatabaseDistrictService.getById(version, districtId);
     }
 }

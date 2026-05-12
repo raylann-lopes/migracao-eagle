@@ -103,13 +103,6 @@ export interface CleanDatabaseTemplate {
   description: string
 }
 
-export interface District {
-  id: number
-  description: string
-  cep: string | null
-  stateId: number | null
-}
-
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options)
   if (!response.ok) {
@@ -130,14 +123,6 @@ export const api = {
     }),
   layouts: () => request<Layout[]>('/api/migration-layouts'),
   cleanDatabaseTemplates: () => request<CleanDatabaseTemplate[]>('/api/clean-database-templates'),
-  districts: (version: string, search: string) =>
-    request<District[]>(
-      `/api/clean-database-templates/${encodeURIComponent(version)}/districts?search=${encodeURIComponent(search)}`,
-    ),
-  district: (version: string, districtId: number) =>
-    request<District>(
-      `/api/clean-database-templates/${encodeURIComponent(version)}/districts/${encodeURIComponent(String(districtId))}`,
-    ),
   uploadSheet: (processId: string, module: MigrationModule, file: File) => {
     const formData = new FormData()
     formData.append('file', file)

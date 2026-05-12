@@ -19,7 +19,6 @@ import {
   api,
   type CleanDatabaseTemplate,
   type CreateMigrationProcessRequest,
-  type District,
   type Layout,
   type MigrationModule,
   type MigrationProcess,
@@ -57,9 +56,6 @@ const loading = ref(false)
 const message = ref('')
 const error = ref('')
 const uploadingModule = ref<MigrationModule | null>(null)
-const districtSearch = ref('')
-const districtResults = ref<District[]>([])
-const searchingDistricts = ref(false)
 
 const form = ref<CreateMigrationProcessRequest>({
   clientName: '',
@@ -131,35 +127,6 @@ async function createProcess() {
     selectedSheet.value = null
     message.value = 'Processo criado.'
   })
-}
-
-async function searchDistricts() {
-  if (!districtSearch.value.trim()) return
-  searchingDistricts.value = true
-  await run(async () => {
-    districtResults.value = await api.districts(form.value.eagleVersion, districtSearch.value)
-    if (districtResults.value.length === 1) {
-      selectDistrict(districtResults.value[0])
-    }
-    if (districtResults.value.length === 0) {
-      message.value = 'Nenhum distrito encontrado para essa versao.'
-    }
-  }, false)
-  searchingDistricts.value = false
-}
-
-function selectDistrict(district: District) {
-  form.value.config.defaultDistrictId = district.id
-  form.value.config.defaultCep = district.cep ?? ''
-  districtSearch.value = `${district.id} - ${district.description}`
-}
-
-function selectDistrictByEvent(event: Event) {
-  const districtId = Number((event.target as HTMLSelectElement).value)
-  const district = districtResults.value.find((item) => item.id === districtId)
-  if (district) {
-    selectDistrict(district)
-  }
 }
 
 async function selectProcess(id: string) {
@@ -250,8 +217,12 @@ function applyCleanDatabasePreset() {
   form.value.eagleVersion = option.version
   form.value.config.defaultDistrictId = null
   form.value.config.defaultCep = ''
-  districtSearch.value = ''
-  districtResults.value = []
+}
+
+function updateDefaultDistrict(event: Event) {
+  const value = (event.target as HTMLInputElement).value.trim()
+  const districtId = Number(value)
+  form.value.config.defaultDistrictId = value && Number.isFinite(districtId) ? districtId : null
 }
 
 function moduleLabel(module: MigrationModule) {
@@ -331,32 +302,19 @@ function shortDate(value: string | null) {
             </select>
           </label>
           <div class="form-grid">
-            <label class="district-picker">
+            <label>
               Distrito padrao
-              <div class="inline-field">
-                <input
-                  v-model="districtSearch"
-                  placeholder="ID ou cidade"
-                  @keydown.enter.prevent="searchDistricts"
-                />
-                <button class="field-button" type="button" :disabled="searchingDistricts" @click="searchDistricts">
-                  {{ searchingDistricts ? 'Buscando' : 'Buscar' }}
-                </button>
-              </div>
-              <select
-                v-if="districtResults.length"
-                class="district-select"
-                @change="selectDistrictByEvent"
-              >
-                <option value="">Selecionar distrito</option>
-                <option v-for="district in districtResults" :key="district.id" :value="district.id">
-                  {{ district.id }} - {{ district.description }}{{ district.cep ? ` - CEP ${district.cep}` : '' }}
-                </option>
-              </select>
+              <input
+                :value="form.config.defaultDistrictId ?? ''"
+                inputmode="numeric"
+                placeholder="Opcional"
+                type="number"
+                @input="updateDefaultDistrict"
+              />
             </label>
             <label>
               CEP padrao
-              <input v-model="form.config.defaultCep" required maxlength="10" readonly />
+              <input v-model="form.config.defaultCep" maxlength="10" placeholder="Opcional" />
             </label>
             <label>
               Estado
