@@ -21,6 +21,7 @@ import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Service
 public class MigrationDatabaseFileService {
@@ -120,6 +121,14 @@ public class MigrationDatabaseFileService {
                             .key(key)
                             .build(),
                     ResponseTransformer.toFile(target));
+        } catch (S3Exception exception) {
+            if (exception.statusCode() == 404) {
+                throw new BusinessException("Banco limpo nao encontrado no S3. Bucket: " + bucket
+                        + ", chave: " + key
+                        + ". Configure a variavel MIGRATION_CLEAN_DB_<VERSAO>_S3_KEY com o caminho exato do arquivo.",
+                        exception);
+            }
+            throw new BusinessException("Falha ao baixar banco limpo do S3: " + exception.getMessage(), exception);
         } catch (SdkException exception) {
             throw new BusinessException("Falha ao baixar banco limpo do S3: " + exception.getMessage(), exception);
         } catch (IOException exception) {
