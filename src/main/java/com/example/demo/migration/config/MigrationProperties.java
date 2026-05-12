@@ -12,9 +12,8 @@ public class MigrationProperties {
 
     private Firebird firebird = new Firebird();
     private CleanDatabase cleanDatabase = new CleanDatabase();
-    private String cleanDatabaseTemplatePath = "./data/templates/EAGLE_LIMPO.FDB";
-    private String eagleWorkingDatabasePath = "./data/work/EAGLEERP.FDB";
-    private String finalDatabaseOutputDir = "./data/final";
+    private FinalDatabase finalDatabase = new FinalDatabase();
+    private String workDir = "/tmp/migracao-eagle";
 
     public Firebird getFirebird() {
         return firebird;
@@ -32,28 +31,20 @@ public class MigrationProperties {
         this.cleanDatabase = cleanDatabase;
     }
 
-    public String getCleanDatabaseTemplatePath() {
-        return cleanDatabaseTemplatePath;
+    public FinalDatabase getFinalDatabase() {
+        return finalDatabase;
     }
 
-    public void setCleanDatabaseTemplatePath(String cleanDatabaseTemplatePath) {
-        this.cleanDatabaseTemplatePath = cleanDatabaseTemplatePath;
+    public void setFinalDatabase(FinalDatabase finalDatabase) {
+        this.finalDatabase = finalDatabase;
     }
 
-    public String getEagleWorkingDatabasePath() {
-        return eagleWorkingDatabasePath;
+    public String getWorkDir() {
+        return workDir;
     }
 
-    public void setEagleWorkingDatabasePath(String eagleWorkingDatabasePath) {
-        this.eagleWorkingDatabasePath = eagleWorkingDatabasePath;
-    }
-
-    public String getFinalDatabaseOutputDir() {
-        return finalDatabaseOutputDir;
-    }
-
-    public void setFinalDatabaseOutputDir(String finalDatabaseOutputDir) {
-        this.finalDatabaseOutputDir = finalDatabaseOutputDir;
+    public void setWorkDir(String workDir) {
+        this.workDir = workDir;
     }
 
     public static class Firebird {
@@ -125,7 +116,7 @@ public class MigrationProperties {
     public static class CleanDatabase {
         private S3 s3 = new S3();
         private List<Template> templates = new ArrayList<>();
-        private String cacheDir = "./data/cache/templates";
+        private String cacheDir = "/tmp/migracao-eagle/templates";
 
         public S3 getS3() {
             return s3;
@@ -155,6 +146,7 @@ public class MigrationProperties {
     public static class S3 {
         private String bucket = "eagle-migracao-templates";
         private String region = "sa-east-1";
+        private String prefix = "";
 
         public String getBucket() {
             return bucket;
@@ -171,13 +163,41 @@ public class MigrationProperties {
         public void setRegion(String region) {
             this.region = region;
         }
+
+        public String getPrefix() {
+            return prefix;
+        }
+
+        public void setPrefix(String prefix) {
+            this.prefix = prefix;
+        }
+    }
+
+    public static class FinalDatabase {
+        private S3 s3 = new S3();
+        private String downloadCacheDir = "/tmp/migracao-eagle/downloads";
+
+        public S3 getS3() {
+            return s3;
+        }
+
+        public void setS3(S3 s3) {
+            this.s3 = s3;
+        }
+
+        public String getDownloadCacheDir() {
+            return downloadCacheDir;
+        }
+
+        public void setDownloadCacheDir(String downloadCacheDir) {
+            this.downloadCacheDir = downloadCacheDir;
+        }
     }
 
     public static class Template {
         private String version;
         private String description;
         private String s3Key;
-        private String localPath;
 
         public String getVersion() {
             return version;
@@ -203,12 +223,5 @@ public class MigrationProperties {
             this.s3Key = s3Key;
         }
 
-        public String getLocalPath() {
-            return localPath;
-        }
-
-        public void setLocalPath(String localPath) {
-            this.localPath = localPath;
-        }
     }
 }

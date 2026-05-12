@@ -34,29 +34,16 @@ public class CleanDatabaseTemplateService {
         if (!templates.isEmpty()) {
             return templates;
         }
-        return List.of(new CleanDatabaseTemplateResponse(
-                "local",
-                "Banco limpo local"));
+        return List.of();
     }
 
     public String templateReferenceForVersion(String version) {
         MigrationProperties.Template template = templateForVersion(version);
-        if (template == null) {
-            return properties.getCleanDatabaseTemplatePath();
-        }
         return storageUri(template);
     }
 
     public Path localTemplatePathForVersion(String version) {
         String reference = templateReferenceForVersion(version);
-        if (!reference.startsWith("s3://")) {
-            Path localPath = Path.of(reference).toAbsolutePath().normalize();
-            if (!Files.isRegularFile(localPath)) {
-                throw new BusinessException("Banco limpo da versao " + version + " nao encontrado no ambiente.");
-            }
-            return localPath;
-        }
-
         Path cachedPath = Path.of(properties.getCleanDatabase().getCacheDir())
                 .toAbsolutePath()
                 .normalize()
@@ -71,7 +58,7 @@ public class CleanDatabaseTemplateService {
 
     private MigrationProperties.Template templateForVersion(String version) {
         if (properties.getCleanDatabase().getTemplates().isEmpty()) {
-            return null;
+            throw new BusinessException("Nenhum banco limpo foi configurado no ambiente AWS.");
         }
         return properties.getCleanDatabase().getTemplates().stream()
                 .filter(template -> template.getVersion().equals(version))
@@ -87,17 +74,11 @@ public class CleanDatabaseTemplateService {
     }
 
     private String storageUri(MigrationProperties.Template template) {
-        if (!isBlank(template.getLocalPath())) {
-            Path localPath = Path.of(template.getLocalPath()).toAbsolutePath().normalize();
-            if (Files.isRegularFile(localPath)) {
-                return localPath.toString();
-            }
-        }
         if (!isBlank(template.getS3Key())) {
             String bucket = properties.getCleanDatabase().getS3().getBucket();
             return "s3://" + bucket + "/" + template.getS3Key();
         }
-        return template.getLocalPath();
+        throw new BusinessException("Banco limpo da versao " + template.getVersion() + " nao possui chave S3 configurada.");
     }
 
     private void downloadFromS3(String storageUri, Path target) {

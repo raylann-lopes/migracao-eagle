@@ -5,5 +5,6 @@ import java.nio.file.Path;
 public record PreparedDatabase(
         Path workingDatabasePath,
         Path finalDatabasePath,
-        String finalDatabaseFilename) {
+        String finalDatabaseFilename,
+        String finalDatabaseStorageUri) {
 }

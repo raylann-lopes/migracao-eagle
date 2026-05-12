@@ -15,10 +15,12 @@ import java.util.Locale;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Service
 public class MigrationDatabaseFileService {
@@ -34,24 +36,30 @@ public class MigrationDatabaseFileService {
     }
 
     public PreparedDatabase prepareFinalDatabase(MigrationProcessEntity process) {
-        Path workingDatabase = Path.of(properties.getEagleWorkingDatabasePath()).toAbsolutePath().normalize();
+        Path processWorkDir = Path.of(properties.getWorkDir())
+                .toAbsolutePath()
+                .normalize()
+                .resolve(process.getId().toString());
+        Path workingDatabase = processWorkDir.resolve("EAGLEERP.FDB");
         String filename = finalFilename(process);
-        Path finalDatabase = Path.of(properties.getFinalDatabaseOutputDir()).toAbsolutePath().normalize().resolve(filename);
+        Path finalDatabase = processWorkDir.resolve(filename);
+        String finalStorageUri = finalStorageUri(process, filename);
 
         try {
             Files.createDirectories(workingDatabase.getParent());
-            Files.createDirectories(finalDatabase.getParent());
             copyCleanDatabaseTemplate(process.getCleanDatabasePath(), workingDatabase);
-            return new PreparedDatabase(workingDatabase, finalDatabase, filename);
+            return new PreparedDatabase(workingDatabase, finalDatabase, filename, finalStorageUri);
         } catch (IOException exception) {
             throw new BusinessException("Falha ao preparar banco limpo do Eagle: " + exception.getMessage(), exception);
         }
     }
 
-    public void publishFinalDatabase(PreparedDatabase preparedDatabase) {
+    public String publishFinalDatabase(PreparedDatabase preparedDatabase) {
         try {
             Files.copy(preparedDatabase.workingDatabasePath(), preparedDatabase.finalDatabasePath(), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException exception) {
+            uploadToS3(preparedDatabase.finalDatabaseStorageUri(), preparedDatabase.finalDatabasePath());
+            return preparedDatabase.finalDatabaseStorageUri();
+        } catch (IOException | SdkException exception) {
             throw new BusinessException("Falha ao gerar banco final para download: " + exception.getMessage(), exception);
         }
     }
@@ -59,6 +67,15 @@ public class MigrationDatabaseFileService {
     public Resource finalDatabaseResource(MigrationProcessEntity process) {
         if (process.getFinalDatabasePath() == null || process.getFinalDatabasePath().isBlank()) {
             throw new BusinessException("Banco final ainda nao foi gerado.");
+        }
+        if (process.getFinalDatabasePath().startsWith("s3://")) {
+            Path downloaded = Path.of(properties.getFinalDatabase().getDownloadCacheDir())
+                    .toAbsolutePath()
+                    .normalize()
+                    .resolve(process.getId().toString())
+                    .resolve(process.getFinalDatabaseFilename());
+            downloadFromS3(process.getFinalDatabasePath(), downloaded);
+            return new FileSystemResource(downloaded);
         }
         Path finalPath = Path.of(process.getFinalDatabasePath()).toAbsolutePath().normalize();
         if (!Files.isRegularFile(finalPath)) {
@@ -85,11 +102,7 @@ public class MigrationDatabaseFileService {
             return;
         }
 
-        Path cleanTemplate = Path.of(templateReference).toAbsolutePath().normalize();
-        if (!Files.isRegularFile(cleanTemplate)) {
-            throw new BusinessException("Banco limpo do Eagle nao encontrado: " + cleanTemplate);
-        }
-        Files.copy(cleanTemplate, workingDatabase, StandardCopyOption.REPLACE_EXISTING);
+        throw new BusinessException("Banco limpo deve estar configurado no S3 para execucao em nuvem.");
     }
 
     private void downloadFromS3(String storageUri, Path target) {
@@ -100,6 +113,7 @@ public class MigrationDatabaseFileService {
             throw new BusinessException("Template S3 do banco limpo invalido: " + storageUri);
         }
         try {
+            Files.createDirectories(target.getParent());
             s3Client.getObject(
                     GetObjectRequest.builder()
                             .bucket(bucket)
@@ -108,6 +122,40 @@ public class MigrationDatabaseFileService {
                     ResponseTransformer.toFile(target));
         } catch (SdkException exception) {
             throw new BusinessException("Falha ao baixar banco limpo do S3: " + exception.getMessage(), exception);
+        } catch (IOException exception) {
+            throw new BusinessException("Falha ao preparar diretorio temporario do banco: " + exception.getMessage(), exception);
         }
+    }
+
+    private void uploadToS3(String storageUri, Path source) {
+        URI uri = URI.create(storageUri);
+        String bucket = uri.getHost();
+        String key = uri.getPath() == null ? "" : uri.getPath().replaceFirst("^/", "");
+        if (bucket == null || bucket.isBlank() || key.isBlank()) {
+            throw new BusinessException("Destino S3 do banco final invalido: " + storageUri);
+        }
+        s3Client.putObject(
+                PutObjectRequest.builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .contentType("application/octet-stream")
+                        .build(),
+                RequestBody.fromFile(source));
+    }
+
+    private String finalStorageUri(MigrationProcessEntity process, String filename) {
+        String bucket = properties.getFinalDatabase().getS3().getBucket();
+        if (bucket == null || bucket.isBlank()) {
+            throw new BusinessException("Bucket S3 do banco final nao configurado.");
+        }
+        String prefix = properties.getFinalDatabase().getS3().getPrefix();
+        String keyPrefix = prefix == null ? "" : prefix.trim().replaceAll("^/+", "").replaceAll("/+$", "");
+        String key = (keyPrefix.isBlank() ? "" : keyPrefix + "/")
+                + process.getEagleVersion()
+                + "/"
+                + process.getId()
+                + "/"
+                + filename;
+        return "s3://" + bucket + "/" + key;
     }
 }

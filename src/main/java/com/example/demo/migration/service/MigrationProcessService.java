@@ -218,8 +218,8 @@ public class MigrationProcessService {
                 }
             }
 
-            databaseFileService.publishFinalDatabase(preparedDatabase);
-            process.setFinalDatabasePath(preparedDatabase.finalDatabasePath().toString());
+            String finalStorageUri = databaseFileService.publishFinalDatabase(preparedDatabase);
+            process.setFinalDatabasePath(finalStorageUri);
             process.setFinalDatabaseFilename(preparedDatabase.finalDatabaseFilename());
             process.setStatus(MigrationStatus.CONCLUIDO);
             process.setLastError(null);
