@@ -21,7 +21,6 @@ services:
 
   firebird:
     image: jacobalberty/firebird:2.5-ss
-    platform: linux/amd64
     environment:
       ISC_PASSWORD: ${APP_MIGRATION_FIREBIRD_PASSWORD}
     volumes:
