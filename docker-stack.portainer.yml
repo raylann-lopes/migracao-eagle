@@ -28,8 +28,8 @@ services:
         source: /opt/migracao-eagle/firebird
         target: /firebird/data
       - type: bind
-        source: /opt/migracao-eagle/firebird/aliases.conf
-        target: /firebird/etc/aliases.conf
+        source: /opt/migracao-eagle/firebird/etc
+        target: /firebird/etc
     healthcheck:
       test: ["CMD-SHELL", "/usr/local/firebird/bin/isql -user SYSDBA -password ${APP_MIGRATION_FIREBIRD_PASSWORD} /firebird/data/MIGRADOR.FDB -q >/dev/null 2>&1"]
       interval: 20s

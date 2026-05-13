@@ -21,8 +21,9 @@ Antes de subir a stack, prepare a pasta usada pelo Firebird:
 
 ```bash
 mkdir -p /opt/migracao-eagle/firebird/work
+mkdir -p /opt/migracao-eagle/firebird/etc
 
-cat > /opt/migracao-eagle/firebird/aliases.conf <<'EOF'
+cat > /opt/migracao-eagle/firebird/etc/aliases.conf <<'EOF'
 EAGLEERP = /firebird/data/work/EAGLEERP.FDB
 EOF
 ```
@@ -38,6 +39,7 @@ Ajuste permissoes:
 ```bash
 chmod 666 /opt/migracao-eagle/firebird/MIGRADOR.FDB
 chmod 777 /opt/migracao-eagle/firebird/work
+chmod 777 /opt/migracao-eagle/firebird/etc
 ```
 
 ## GitHub Container Registry

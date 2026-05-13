@@ -26,7 +26,7 @@ services:
       ISC_PASSWORD: ${APP_MIGRATION_FIREBIRD_PASSWORD}
     volumes:
       - /opt/migracao-eagle/firebird:/firebird/data
-      - /opt/migracao-eagle/firebird/aliases.conf:/firebird/etc/aliases.conf
+      - /opt/migracao-eagle/firebird/etc:/firebird/etc
     healthcheck:
       test: ["CMD-SHELL", "/usr/local/firebird/bin/isql -user SYSDBA -password ${APP_MIGRATION_FIREBIRD_PASSWORD} /firebird/data/MIGRADOR.FDB -q >/dev/null 2>&1"]
       interval: 20s
