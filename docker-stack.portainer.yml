@@ -1,0 +1,121 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: migracao_eagle
+      POSTGRES_USER: migracao_eagle
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U migracao_eagle -d migracao_eagle"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - migracao-eagle
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  firebird:
+    image: jacobalberty/firebird:2.5-ss
+    platform: linux/amd64
+    environment:
+      ISC_PASSWORD: ${FIREBIRD_PASSWORD}
+    volumes:
+      - type: bind
+        source: /opt/migracao-eagle/firebird
+        target: /firebird/data
+      - type: bind
+        source: /opt/migracao-eagle/firebird/aliases.conf
+        target: /firebird/etc/aliases.conf
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/local/firebird/bin/isql -user SYSDBA -password ${FIREBIRD_PASSWORD} /firebird/data/MIGRADOR.FDB -q >/dev/null 2>&1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    networks:
+      - migracao-eagle
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  backend:
+    image: ghcr.io/raylann-lopes/migracao-eagle-backend:${IMAGE_TAG:-latest}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/migracao_eagle
+      SPRING_DATASOURCE_USERNAME: migracao_eagle
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      MIGRATION_CLEAN_DB_S3_BUCKET: ${MIGRATION_CLEAN_DB_S3_BUCKET}
+      MIGRATION_CLEAN_DB_2025_001_S3_KEY: ${MIGRATION_CLEAN_DB_2025_001_S3_KEY}
+      MIGRATION_CLEAN_DB_2025_002_S3_KEY: ${MIGRATION_CLEAN_DB_2025_002_S3_KEY}
+      MIGRATION_CLEAN_DB_2026_001_S3_KEY: ${MIGRATION_CLEAN_DB_2026_001_S3_KEY}
+      MIGRATION_FINAL_DB_S3_BUCKET: ${MIGRATION_FINAL_DB_S3_BUCKET}
+      MIGRATION_FINAL_DB_S3_PREFIX: ${MIGRATION_FINAL_DB_S3_PREFIX}
+      APP_MIGRATION_WORK_DIR: /firebird/data/work
+      APP_MIGRATION_FIREBIRD_ENABLED: "true"
+      APP_MIGRATION_FIREBIRD_JDBC_URL: jdbc:firebirdsql://firebird:3050/{database}?enableProtocol=*&wireCrypt=disabled
+      APP_MIGRATION_FIREBIRD_USERNAME: SYSDBA
+      APP_MIGRATION_FIREBIRD_PASSWORD: ${FIREBIRD_PASSWORD}
+      APP_MIGRATION_FIREBIRD_MIGRATOR_DATABASE: /firebird/data/MIGRADOR.FDB
+      APP_MIGRATION_FIREBIRD_EAGLE_ALIAS_NAME: EAGLEERP
+      JAVA_OPTS: -Xms256m -Xmx1024m
+    volumes:
+      - type: bind
+        source: /opt/migracao-eagle/firebird
+        target: /firebird/data
+    networks:
+      - migracao-eagle
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  frontend:
+    image: ghcr.io/raylann-lopes/migracao-eagle-frontend:${IMAGE_TAG:-latest}
+    networks:
+      - migracao-eagle
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  caddy:
+    image: caddy:2.8-alpine
+    command: caddy reverse-proxy --from ${APP_DOMAIN} --to frontend:80
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: ingress
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: ingress
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - migracao-eagle
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  migracao-eagle:
+    driver: overlay

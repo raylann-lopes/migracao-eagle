@@ -1,0 +1,11 @@
+.git
+.idea
+.env
+data
+target
+frontend/node_modules
+frontend/dist
+frontend/tsconfig.tsbuildinfo
+*.log
+*.FDB
+*.fdb

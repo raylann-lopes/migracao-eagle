@@ -1,0 +1,111 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: migracao-eagle-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: migracao_eagle
+      POSTGRES_USER: migracao_eagle
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U migracao_eagle -d migracao_eagle"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - migracao-eagle
+
+  firebird:
+    image: jacobalberty/firebird:2.5-ss
+    container_name: migracao-eagle-firebird
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      ISC_PASSWORD: ${FIREBIRD_PASSWORD}
+    volumes:
+      - /opt/migracao-eagle/firebird:/firebird/data
+      - /opt/migracao-eagle/firebird/aliases.conf:/firebird/etc/aliases.conf
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/local/firebird/bin/isql -user SYSDBA -password ${FIREBIRD_PASSWORD} /firebird/data/MIGRADOR.FDB -q >/dev/null 2>&1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    networks:
+      - migracao-eagle
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: migracao-eagle-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      firebird:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/migracao_eagle
+      SPRING_DATASOURCE_USERNAME: migracao_eagle
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      MIGRATION_CLEAN_DB_S3_BUCKET: ${MIGRATION_CLEAN_DB_S3_BUCKET}
+      MIGRATION_CLEAN_DB_2025_001_S3_KEY: ${MIGRATION_CLEAN_DB_2025_001_S3_KEY}
+      MIGRATION_CLEAN_DB_2025_002_S3_KEY: ${MIGRATION_CLEAN_DB_2025_002_S3_KEY}
+      MIGRATION_CLEAN_DB_2026_001_S3_KEY: ${MIGRATION_CLEAN_DB_2026_001_S3_KEY}
+      MIGRATION_FINAL_DB_S3_BUCKET: ${MIGRATION_FINAL_DB_S3_BUCKET}
+      MIGRATION_FINAL_DB_S3_PREFIX: ${MIGRATION_FINAL_DB_S3_PREFIX}
+      APP_MIGRATION_WORK_DIR: /firebird/data/work
+      APP_MIGRATION_FIREBIRD_ENABLED: "true"
+      APP_MIGRATION_FIREBIRD_JDBC_URL: jdbc:firebirdsql://firebird:3050/{database}?enableProtocol=*&wireCrypt=disabled
+      APP_MIGRATION_FIREBIRD_USERNAME: SYSDBA
+      APP_MIGRATION_FIREBIRD_PASSWORD: ${FIREBIRD_PASSWORD}
+      APP_MIGRATION_FIREBIRD_MIGRATOR_DATABASE: /firebird/data/MIGRADOR.FDB
+      APP_MIGRATION_FIREBIRD_EAGLE_ALIAS_NAME: EAGLEERP
+      JAVA_OPTS: -Xms256m -Xmx1024m
+    volumes:
+      - /opt/migracao-eagle/firebird:/firebird/data
+    networks:
+      - migracao-eagle
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: migracao-eagle-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - migracao-eagle
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: migracao-eagle-proxy
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    command: caddy reverse-proxy --from ${APP_DOMAIN} --to frontend:80
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - migracao-eagle
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  migracao-eagle:
+    driver: bridge
