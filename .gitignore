@@ -35,8 +35,7 @@ build/
 ### Local environment ###
 .env
 .env.*
-!.env.example
-!.env.portainer.example
+!.env.prod.example
 .agents/
 .claude/
 

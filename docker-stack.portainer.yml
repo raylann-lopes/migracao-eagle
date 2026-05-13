@@ -23,7 +23,7 @@ services:
     image: jacobalberty/firebird:2.5-ss
     platform: linux/amd64
     environment:
-      ISC_PASSWORD: ${FIREBIRD_PASSWORD}
+      ISC_PASSWORD: ${APP_MIGRATION_FIREBIRD_PASSWORD}
     volumes:
       - type: bind
         source: /opt/migracao-eagle/firebird
@@ -32,7 +32,7 @@ services:
         source: /opt/migracao-eagle/firebird/aliases.conf
         target: /firebird/etc/aliases.conf
     healthcheck:
-      test: ["CMD-SHELL", "/usr/local/firebird/bin/isql -user SYSDBA -password ${FIREBIRD_PASSWORD} /firebird/data/MIGRADOR.FDB -q >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "/usr/local/firebird/bin/isql -user SYSDBA -password ${APP_MIGRATION_FIREBIRD_PASSWORD} /firebird/data/MIGRADOR.FDB -q >/dev/null 2>&1"]
       interval: 20s
       timeout: 10s
       retries: 10
@@ -65,7 +65,7 @@ services:
       APP_MIGRATION_FIREBIRD_ENABLED: "true"
       APP_MIGRATION_FIREBIRD_JDBC_URL: jdbc:firebirdsql://firebird:3050/{database}?enableProtocol=*&wireCrypt=disabled
       APP_MIGRATION_FIREBIRD_USERNAME: SYSDBA
-      APP_MIGRATION_FIREBIRD_PASSWORD: ${FIREBIRD_PASSWORD}
+      APP_MIGRATION_FIREBIRD_PASSWORD: ${APP_MIGRATION_FIREBIRD_PASSWORD}
       APP_MIGRATION_FIREBIRD_MIGRATOR_DATABASE: /firebird/data/MIGRADOR.FDB
       APP_MIGRATION_FIREBIRD_EAGLE_ALIAS_NAME: EAGLEERP
       JAVA_OPTS: -Xms256m -Xmx1024m

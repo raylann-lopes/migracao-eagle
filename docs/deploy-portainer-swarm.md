@@ -64,6 +64,6 @@ No Portainer:
 docker-stack.portainer.yml
 ```
 
-5. Configure as variaveis do `.env.portainer.example` no Portainer.
+5. Configure as variaveis do `.env.prod.example` no Portainer.
 
 Nao exponha publicamente as portas `3050`, `5432` ou `8080`. A stack publica somente `80` e `443` pelo Caddy.
