@@ -58,7 +58,9 @@ a:hover {
   color: #ffffff;
   display: flex;
   justify-content: space-between;
+  overflow: hidden;
   padding: 18px;
+  position: relative;
 }
 
 .brand-block,
@@ -133,12 +135,68 @@ h2 {
   gap: 10px;
 }
 
+.operation-status {
+  align-items: center;
+  background: rgba(244, 123, 32, 0.14);
+  border: 1px solid rgba(244, 123, 32, 0.34);
+  border-radius: 999px;
+  color: #fed7aa;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.operation-status strong {
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.top-progress {
+  background: rgba(255, 255, 255, 0.08);
+  bottom: 0;
+  height: 4px;
+  left: 0;
+  overflow: hidden;
+  position: absolute;
+  right: 0;
+}
+
+.top-progress div {
+  background: linear-gradient(90deg, #f47b20, #ffb86b);
+  height: 100%;
+  transition: width 220ms ease;
+}
+
+.top-progress.indeterminate div {
+  animation: top-progress-sweep 1.25s ease-in-out infinite;
+  border-radius: 999px;
+  width: 42%;
+}
+
+@keyframes top-progress-sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  55% {
+    transform: translateX(90%);
+  }
+
+  100% {
+    transform: translateX(250%);
+  }
+}
+
 .grid {
   display: grid;
   gap: 18px;
-  grid-template-columns: 360px minmax(0, 1fr);
+  grid-template-columns: 360px minmax(0, 1fr) 280px;
   margin: 0 auto;
-  max-width: 1480px;
+  max-width: 1540px;
   min-width: 0;
 }
 
@@ -153,8 +211,18 @@ h2 {
 .workspace {
   display: grid;
   gap: 16px;
+  align-content: start;
   min-width: 0;
   overflow: hidden;
+}
+
+.right-sidebar {
+  align-content: start;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  position: sticky;
+  top: 18px;
 }
 
 .panel-title {
@@ -279,6 +347,10 @@ select:focus {
   border-color: #fed7aa;
   color: #9a3412;
   font-weight: 800;
+}
+
+.download-button.full {
+  width: 100%;
 }
 
 .primary:disabled,
@@ -435,6 +507,15 @@ select:focus {
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.execution-panel.completed {
+  background: linear-gradient(90deg, #ffffff, #fff7ed);
+  border-color: #fed7aa;
+}
+
+.execution-panel .panel-title + p {
+  margin-top: 6px;
 }
 
 .progress-track {
@@ -620,6 +701,123 @@ th {
   text-align: center;
 }
 
+.side-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.side-card.process-focus {
+  border-left: 4px solid var(--orange);
+}
+
+.side-card.process-focus > strong {
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.side-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.side-title {
+  align-items: center;
+  color: #1d2633;
+  display: flex;
+  gap: 8px;
+}
+
+.side-title svg {
+  color: var(--orange);
+}
+
+.topic-list {
+  display: grid;
+  gap: 8px;
+}
+
+.topic-list a {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #263244;
+  display: flex;
+  justify-content: space-between;
+  min-height: 38px;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.topic-list a:hover {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.topic-list span {
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.topic-list strong {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  max-width: 98px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.final-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.check-list {
+  display: grid;
+  gap: 8px;
+}
+
+.check-list span {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 8px;
+}
+
+.check-list span::before {
+  background: #cbd5e1;
+  border-radius: 999px;
+  content: "";
+  display: block;
+  flex: 0 0 8px;
+  height: 8px;
+  width: 8px;
+}
+
+.check-list span.ok {
+  color: var(--success);
+}
+
+.check-list span.ok::before {
+  background: var(--success);
+}
+
 @media (max-width: 1180px) {
   .grid,
   .summary-band,
@@ -634,6 +832,10 @@ th {
 
   .execution-actions {
     justify-content: flex-start;
+  }
+
+  .right-sidebar {
+    position: static;
   }
 }
 

@@ -46,7 +46,7 @@ export interface ProcedureExecution {
   id: string
   stepOrder: number
   procedureName: string
-  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED'
+  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'SKIPPED' | 'FAILED'
   startedAt: string | null
   finishedAt: string | null
   errorMessage: string | null

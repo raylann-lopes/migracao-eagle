@@ -38,14 +38,6 @@ const defaultCleanDatabaseTemplates: CleanDatabaseTemplate[] = [
     version: '2025.001',
     description: 'Eagle Gestao 2025.001',
   },
-  {
-    version: '2025.002',
-    description: 'Eagle Gestao 2025.002',
-  },
-  {
-    version: '2026.001',
-    description: 'Eagle Gestao 2026.001',
-  },
 ]
 const processes = ref<MigrationProcess[]>([])
 const layouts = ref<Layout[]>([])
@@ -56,6 +48,7 @@ const loading = ref(false)
 const message = ref('')
 const error = ref('')
 const uploadingModule = ref<MigrationModule | null>(null)
+const operationLabel = ref('')
 
 const form = ref<CreateMigrationProcessRequest>({
   clientName: '',
@@ -88,12 +81,26 @@ const sheetStats = computed(() => {
 })
 const procedureStats = computed(() => {
   const procedures = selected.value?.procedures ?? []
-  const done = procedures.filter((procedure) => procedure.status === 'SUCCESS').length
+  const done = procedures.filter((procedure) => procedure.status === 'SUCCESS' || procedure.status === 'SKIPPED').length
   return {
     total: procedures.length,
     done,
     percent: procedures.length ? Math.round((done / procedures.length) * 100) : 0,
   }
+})
+const pendingProcedures = computed(() => selected.value?.procedures.filter((procedure) => procedure.status === 'PENDING').length ?? 0)
+const failedProcedures = computed(() => selected.value?.procedures.filter((procedure) => procedure.status === 'FAILED').length ?? 0)
+const completedModules = computed(() => selected.value?.sheets.filter((sheet) => sheet.errorCount === 0).length ?? 0)
+const showHeaderProgress = computed(() => loading.value || selected.value?.status === 'PROCEDURES_EM_EXECUCAO')
+const headerProgressPercent = computed(() => {
+  if (!selected.value) return loading.value ? 12 : 0
+  if (selected.value.status === 'CONCLUIDO') return 100
+  return Math.max(procedureStats.value.percent, loading.value ? 12 : 0)
+})
+const headerProgressLabel = computed(() => {
+  if (operationLabel.value) return operationLabel.value
+  if (selected.value?.status === 'PROCEDURES_EM_EXECUCAO') return 'Procedures em execucao'
+  return 'Processando'
 })
 
 onMounted(async () => {
@@ -126,7 +133,7 @@ async function createProcess() {
     selected.value = created
     selectedSheet.value = null
     message.value = 'Processo criado.'
-  })
+  }, true, 'Criando processo')
 }
 
 async function selectProcess(id: string) {
@@ -145,7 +152,7 @@ async function uploadSheet(module: MigrationModule, event: Event) {
     selectedSheet.value = await api.uploadSheet(selected.value!.id, module, file)
     selected.value = await api.getProcess(selected.value!.id)
     message.value = `${module}: planilha validada.`
-  })
+  }, true, `Validando ${moduleLabels[module].toLowerCase()}`)
   uploadingModule.value = null
   input.value = ''
 }
@@ -162,7 +169,7 @@ async function importMigrador() {
   await run(async () => {
     selected.value = await api.importMigrador(selected.value!.id)
     message.value = 'Planilhas importadas no MIGRADOR.'
-  })
+  }, true, 'Importando planilhas no MIGRADOR')
 }
 
 async function runCompleteMigration() {
@@ -173,7 +180,7 @@ async function runCompleteMigration() {
       selected.value.status === 'CONCLUIDO'
         ? 'Migracao concluida. Banco final disponivel para download.'
         : 'Migracao finalizada com falha. Confira o status e as procedures.'
-  })
+  }, true, 'Rodando migracao completa')
 }
 
 async function executeNext() {
@@ -182,7 +189,7 @@ async function executeNext() {
     await api.executeNextProcedure(selected.value!.id)
     selected.value = await api.getProcess(selected.value!.id)
     message.value = 'Procedure executada.'
-  })
+  }, true, 'Executando proxima procedure')
 }
 
 async function refreshSelected() {
@@ -190,16 +197,20 @@ async function refreshSelected() {
   await selectProcess(selected.value.id)
 }
 
-async function run(action: () => Promise<void>, showLoading = true) {
+async function run(action: () => Promise<void>, showLoading = true, label = 'Processando') {
   error.value = ''
   message.value = ''
-  if (showLoading) loading.value = true
+  if (showLoading) {
+    loading.value = true
+    operationLabel.value = label
+  }
   try {
     await action()
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Falha inesperada'
   } finally {
     loading.value = false
+    operationLabel.value = ''
   }
 }
 
@@ -252,7 +263,7 @@ function shortDate(value: string | null) {
 
 <template>
   <main class="app-shell">
-    <header class="topbar command-header">
+    <header class="topbar command-header" :class="{ 'is-busy': showHeaderProgress }">
       <div class="brand-block">
         <div class="brand-mark">E</div>
         <div>
@@ -262,6 +273,11 @@ function shortDate(value: string | null) {
         </div>
       </div>
       <div class="header-actions">
+        <span v-if="showHeaderProgress" class="operation-status">
+          <Clock3 :size="14" />
+          {{ headerProgressLabel }}
+          <strong>{{ headerProgressPercent }}%</strong>
+        </span>
         <span v-if="selected" class="status-pill" :class="statusClass(selected.status)">
           <Activity :size="15" />
           {{ statusLabel(selected.status) }}
@@ -269,6 +285,9 @@ function shortDate(value: string | null) {
         <button class="icon-button" type="button" title="Atualizar" @click="refreshSelected">
           <RefreshCw :size="18" />
         </button>
+      </div>
+      <div v-if="showHeaderProgress" class="top-progress" :class="{ indeterminate: loading }">
+        <div :style="{ width: loading ? undefined : `${headerProgressPercent}%` }"></div>
       </div>
     </header>
 
@@ -353,7 +372,7 @@ function shortDate(value: string | null) {
         </div>
 
         <template v-else>
-          <section class="metrics-grid">
+          <section id="overview" class="metrics-grid">
             <article>
               <span>Planilhas</span>
               <strong>{{ sheetStats.total }}/{{ modules.length }}</strong>
@@ -395,12 +414,16 @@ function shortDate(value: string | null) {
             </div>
           </section>
 
-          <section class="panel execution-panel">
+          <section id="execution" class="panel execution-panel" :class="{ completed: selected.status === 'CONCLUIDO' }">
             <div>
               <div class="panel-title">
                 <Workflow :size="18" />
-                <h2>Execucao completa</h2>
+                <h2>{{ selected.status === 'CONCLUIDO' ? 'Migracao concluida' : 'Execucao completa' }}</h2>
               </div>
+              <p>
+                {{ procedureStats.done }} de {{ procedureStats.total }} etapas finalizadas
+                <template v-if="failedProcedures"> · {{ failedProcedures }} com falha</template>
+              </p>
               <div class="progress-track">
                 <div :style="{ width: `${procedureStats.percent}%` }"></div>
               </div>
@@ -422,7 +445,7 @@ function shortDate(value: string | null) {
             <p v-if="selected.lastError" class="error-text">{{ selected.lastError }}</p>
           </section>
 
-          <section class="panel">
+          <section id="sheets" class="panel">
             <div class="section-heading">
               <div>
                 <div class="panel-title">
@@ -469,7 +492,7 @@ function shortDate(value: string | null) {
             </div>
           </section>
 
-          <section v-if="selectedSheet" class="panel">
+          <section v-if="selectedSheet" id="preview" class="panel">
             <div class="section-heading">
               <div>
                 <div class="panel-title">
@@ -505,7 +528,7 @@ function shortDate(value: string | null) {
             </div>
           </section>
 
-          <section class="panel">
+          <section id="procedures" class="panel">
             <div class="section-heading">
               <div>
                 <div class="panel-title">
@@ -528,6 +551,73 @@ function shortDate(value: string | null) {
           </section>
         </template>
       </section>
+
+      <aside v-if="selected" class="right-sidebar">
+        <section class="side-card process-focus">
+          <span class="side-label">Processo atual</span>
+          <strong>{{ selected.clientName }}</strong>
+          <span class="status-pill compact" :class="statusClass(selected.status)">
+            {{ statusLabel(selected.status) }}
+          </span>
+        </section>
+
+        <section class="side-card">
+          <div class="side-title">
+            <Activity :size="16" />
+            <strong>Topicos</strong>
+          </div>
+          <nav class="topic-list" aria-label="Topicos do processo">
+            <a href="#overview">
+              <span>Visao geral</span>
+              <strong>{{ sheetStats.valid }} linhas</strong>
+            </a>
+            <a href="#execution">
+              <span>Execucao</span>
+              <strong>{{ procedureStats.percent }}%</strong>
+            </a>
+            <a href="#sheets">
+              <span>Planilhas</span>
+              <strong>{{ completedModules }}/{{ modules.length }}</strong>
+            </a>
+            <a href="#procedures">
+              <span>Procedures</span>
+              <strong>{{ pendingProcedures }} pend.</strong>
+            </a>
+            <a v-if="selectedSheet" href="#preview">
+              <span>Previa</span>
+              <strong>{{ moduleLabel(selectedSheet.module) }}</strong>
+            </a>
+          </nav>
+        </section>
+
+        <section class="side-card final-card">
+          <div class="side-title">
+            <Database :size="16" />
+            <strong>Banco final</strong>
+          </div>
+          <p>{{ selected.finalDatabaseFilename || 'Aguardando conclusao da migracao.' }}</p>
+          <a
+            v-if="selected.finalDatabaseAvailable"
+            class="download-button full"
+            :href="`/api/migration-processes/${selected.id}/final-database`"
+          >
+            <FileDown :size="16" />
+            Baixar banco
+          </a>
+        </section>
+
+        <section class="side-card">
+          <div class="side-title">
+            <ShieldCheck :size="16" />
+            <strong>Conferencia</strong>
+          </div>
+          <div class="check-list">
+            <span :class="{ ok: sheetStats.errors === 0 }">Sem erros de layout</span>
+            <span :class="{ ok: selected.finalDatabaseAvailable }">Banco final gerado</span>
+            <span :class="{ ok: failedProcedures === 0 }">Sem procedure com falha</span>
+          </div>
+        </section>
+      </aside>
     </div>
   </main>
 </template>
