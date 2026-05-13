@@ -26,13 +26,11 @@ services:
     image: jacobalberty/firebird:2.5-ss
     environment:
       ISC_PASSWORD: ${APP_MIGRATION_FIREBIRD_PASSWORD}
+      FIREBIRD_ALIASES: EAGLEERP=/firebird/data/work/EAGLEERP.FDB
     volumes:
       - type: bind
         source: /opt/migracao-eagle/firebird
-        target: /firebird/data
-      - type: bind
-        source: /opt/migracao-eagle/firebird/etc
-        target: /firebird/etc
+        target: /firebird
     healthcheck:
       test: ["CMD-SHELL", "/usr/local/firebird/bin/isql -user SYSDBA -password ${APP_MIGRATION_FIREBIRD_PASSWORD} /firebird/data/MIGRADOR.FDB -q >/dev/null 2>&1"]
       interval: 20s
@@ -73,7 +71,7 @@ services:
       JAVA_OPTS: -Xms256m -Xmx1024m
     volumes:
       - type: bind
-        source: /opt/migracao-eagle/firebird
+        source: /opt/migracao-eagle/firebird/data
         target: /firebird/data
     networks:
       - migracao-eagle

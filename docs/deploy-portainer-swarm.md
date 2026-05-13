@@ -20,26 +20,22 @@ eagle.wizeflowsolutions.cloud
 Antes de subir a stack, prepare a pasta usada pelo Firebird:
 
 ```bash
-mkdir -p /opt/migracao-eagle/firebird/work
-mkdir -p /opt/migracao-eagle/firebird/etc
-
-cat > /opt/migracao-eagle/firebird/etc/aliases.conf <<'EOF'
-EAGLEERP = /firebird/data/work/EAGLEERP.FDB
-EOF
+mkdir -p /opt/migracao-eagle/firebird/data/work
 ```
 
 Envie o banco migrador para:
 
 ```text
-/opt/migracao-eagle/firebird/MIGRADOR.FDB
+/opt/migracao-eagle/firebird/data/MIGRADOR.FDB
 ```
 
 Ajuste permissoes:
 
 ```bash
-chmod 666 /opt/migracao-eagle/firebird/MIGRADOR.FDB
-chmod 777 /opt/migracao-eagle/firebird/work
-chmod 777 /opt/migracao-eagle/firebird/etc
+chmod 777 /opt/migracao-eagle/firebird
+chmod 777 /opt/migracao-eagle/firebird/data
+chmod 777 /opt/migracao-eagle/firebird/data/work
+chmod 666 /opt/migracao-eagle/firebird/data/MIGRADOR.FDB
 ```
 
 ## GitHub Container Registry

@@ -24,9 +24,9 @@ services:
     restart: unless-stopped
     environment:
       ISC_PASSWORD: ${APP_MIGRATION_FIREBIRD_PASSWORD}
+      FIREBIRD_ALIASES: EAGLEERP=/firebird/data/work/EAGLEERP.FDB
     volumes:
-      - /opt/migracao-eagle/firebird:/firebird/data
-      - /opt/migracao-eagle/firebird/etc:/firebird/etc
+      - /opt/migracao-eagle/firebird:/firebird
     healthcheck:
       test: ["CMD-SHELL", "/usr/local/firebird/bin/isql -user SYSDBA -password ${APP_MIGRATION_FIREBIRD_PASSWORD} /firebird/data/MIGRADOR.FDB -q >/dev/null 2>&1"]
       interval: 20s
@@ -68,7 +68,7 @@ services:
       APP_MIGRATION_FIREBIRD_EAGLE_ALIAS_NAME: EAGLEERP
       JAVA_OPTS: -Xms256m -Xmx1024m
     volumes:
-      - /opt/migracao-eagle/firebird:/firebird/data
+      - /opt/migracao-eagle/firebird/data:/firebird/data
     networks:
       - migracao-eagle
 
