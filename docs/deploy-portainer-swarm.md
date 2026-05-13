@@ -38,6 +38,14 @@ chmod 777 /opt/migracao-eagle/firebird/data/work
 chmod 666 /opt/migracao-eagle/firebird/data/MIGRADOR.FDB
 ```
 
+Se o Firebird ja tentou subir antes e ficou com inicializacao quebrada, limpe apenas os arquivos internos gerados pela imagem, preservando `/opt/migracao-eagle/firebird/data`:
+
+```bash
+rm -rf /opt/migracao-eagle/firebird/etc
+rm -rf /opt/migracao-eagle/firebird/system
+rm -rf /opt/migracao-eagle/firebird/log
+```
+
 ## GitHub Container Registry
 
 As imagens sao publicadas pelo GitHub Actions:

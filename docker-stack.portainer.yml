@@ -23,7 +23,7 @@ services:
         condition: on-failure
 
   firebird:
-    image: jacobalberty/firebird:2.5-ss
+    image: jacobalberty/firebird:v2.5.9-ss-jessie
     environment:
       ISC_PASSWORD: ${APP_MIGRATION_FIREBIRD_PASSWORD}
       FIREBIRD_ALIASES: EAGLEERP=/firebird/data/work/EAGLEERP.FDB
