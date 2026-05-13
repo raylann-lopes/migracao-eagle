@@ -66,4 +66,12 @@ docker-stack.portainer.yml
 
 5. Configure as variaveis do `.env.prod.example` no Portainer.
 
-Nao exponha publicamente as portas `3050`, `5432` ou `8080`. A stack publica somente `80` e `443` pelo Caddy.
+Como a VPS ja usa Traefik, a stack nao publica `80` e `443` diretamente. Configure `TRAEFIK_NETWORK` com o nome da rede externa usada pelo Traefik.
+
+Para descobrir o nome no servidor:
+
+```bash
+docker network ls | grep -i traefik
+```
+
+Nao exponha publicamente as portas `3050`, `5432` ou `8080`. O acesso publico entra pelo Traefik.
