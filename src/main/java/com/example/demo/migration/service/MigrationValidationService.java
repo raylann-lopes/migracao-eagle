@@ -107,7 +107,7 @@ public class MigrationValidationService {
 
     private String normalizeText(String fieldName, String value) {
         String normalized = value.replaceAll("\\s+", " ");
-        if (Set.of("EMAIL", "EMAIL2").contains(fieldName)) {
+        if (Set.of("EMAIL").contains(fieldName)) {
             return normalized.toLowerCase(Locale.ROOT);
         }
         if (Set.of("TIPOPESSOA", "BLOQUEADO", "FRACIONAR", "INATIVO").contains(fieldName)) {

@@ -4,5 +4,6 @@ public enum ProcedureExecutionStatus {
     PENDING,
     RUNNING,
     SUCCESS,
+    SKIPPED,
     FAILED
 }

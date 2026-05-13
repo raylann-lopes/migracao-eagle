@@ -9,6 +9,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -77,8 +78,64 @@ public class FirebirdMigradorClient {
         }
     }
 
+    public void configurarMigracao(
+            String migratorDatabase,
+            Integer defaultDistrictId,
+            String defaultCep,
+            String companyState,
+            boolean migrateReceivables,
+            boolean migrateClientes,
+            boolean migrateFornecedores,
+            boolean migrateGrupos,
+            boolean migrateMarcas,
+            boolean migrateProdutos,
+            boolean migrateUnidades,
+            boolean migrateKardexNegativo) {
+        ensureEnabled();
+        String sql = "EXECUTE PROCEDURE " + quoted("CONFIGURAR_MIGRACAO")
+                + " (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try (Connection connection = connection(migratorDatabase);
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            if (defaultDistrictId == null) {
+                statement.setNull(1, Types.INTEGER);
+            } else {
+                statement.setInt(1, defaultDistrictId);
+            }
+            if (defaultCep == null || defaultCep.isBlank()) {
+                statement.setNull(2, Types.VARCHAR);
+            } else {
+                statement.setString(2, defaultCep.trim());
+            }
+            statement.setString(3, companyState == null ? null : companyState.trim().toUpperCase());
+            statement.setInt(4, migrateReceivables ? 1 : 0);
+            statement.setInt(5, migrateClientes ? 1 : 0);
+            statement.setInt(6, migrateFornecedores ? 1 : 0);
+            statement.setInt(7, migrateGrupos ? 1 : 0);
+            statement.setInt(8, migrateMarcas ? 1 : 0);
+            statement.setInt(9, migrateProdutos ? 1 : 0);
+            statement.setInt(10, migrateUnidades ? 1 : 0);
+            statement.setInt(11, migrateKardexNegativo ? 1 : 0);
+            statement.execute();
+        } catch (SQLException exception) {
+            throw new BusinessException("Falha ao configurar migracao: " + exception.getMessage(), exception);
+        }
+    }
+
     public void assertEnabledForFullMigration() {
         ensureEnabled();
+    }
+
+    public void assertEagleAliasAvailable() {
+        ensureEnabled();
+        String alias = properties.getFirebird().getEagleAliasName();
+        try (Connection ignored = connection(alias)) {
+            // Apenas valida se o alias configurado no Firebird consegue abrir o banco limpo.
+        } catch (SQLException exception) {
+            throw new BusinessException("Alias Firebird " + alias + " nao esta acessivel. "
+                    + "No Docker, monte data/aliases.conf em /firebird/etc/aliases.conf "
+                    + "e confirme que ele aponta para /firebird/data/work/EAGLEERP.FDB. "
+                    + "Erro original: " + exception.getMessage(), exception);
+        }
     }
 
     private Connection connection(String database) throws SQLException {

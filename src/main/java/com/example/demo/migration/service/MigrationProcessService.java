@@ -91,7 +91,25 @@ public class MigrationProcessService {
         process.setMigrateReceivables(request.config().migrateReceivables());
         process.setStatus(MigrationStatus.CRIADO);
         initializeProcedurePlan(process);
+
         return mapper.toResponse(processRepository.save(process));
+    }
+
+    private void runSetupProcedures(MigrationProcessEntity process) {
+        for (ProcedureExecutionEntity execution : process.getProcedureExecutions()) {
+            if (execution.getProcedureName().startsWith("UTIL_")) {
+                try {
+                    firebirdClient.executeProcedure(process.getMigratorDatabase(), execution.getProcedureName());
+                    execution.setStatus(ProcedureExecutionStatus.SUCCESS);
+                    execution.setStartedAt(OffsetDateTime.now());
+                    execution.setFinishedAt(OffsetDateTime.now());
+                } catch (Exception e) {
+                    execution.setStatus(ProcedureExecutionStatus.FAILED);
+                    execution.setErrorMessage("Falha no setup inicial: " + e.getMessage());
+                    // Não travamos a criação se o setup falhar, mas o status ficará visível
+                }
+            }
+        }
     }
 
     @Transactional(readOnly = true)
@@ -198,6 +216,9 @@ public class MigrationProcessService {
     public MigrationProcessResponse runCompleteMigration(UUID processId) {
         MigrationProcessEntity process = getProcess(processId);
         try {
+            // Atualiza o caminho do banco limpo caso a configuracao tenha mudado
+            process.setCleanDatabasePath(cleanDatabaseTemplateService.templateReferenceForVersion(process.getEagleVersion()));
+
             validateReadyForFullMigration(process);
             firebirdClient.assertEnabledForFullMigration();
 
@@ -205,6 +226,14 @@ public class MigrationProcessService {
             process.setEagleWorkingDatabasePath(preparedDatabase.workingDatabasePath().toString());
             process.setFinalDatabasePath(null);
             process.setFinalDatabaseFilename(null);
+            resetProcedureExecutions(process);
+
+            // Força o flush para garantir que o caminho do banco de trabalho esteja salvo
+            processRepository.saveAndFlush(process);
+
+            // Aguarda um pequeno instante para o Docker/File System sincronizar
+            try { Thread.sleep(1000); } catch (InterruptedException e) {}
+            firebirdClient.assertEagleAliasAvailable();
 
             importSheetsIntoMigrador(process);
             process.setStatus(MigrationStatus.IMPORTADO_MIGRADOR);
@@ -275,15 +304,25 @@ public class MigrationProcessService {
                 && process.getStatus() != MigrationStatus.FALHOU) {
             throw new BusinessException("Importe as planilhas validas para o MIGRADOR antes de executar procedures.");
         }
+
+        // Garante que o banco Eagle esteja preparado antes de qualquer procedure
+        if (process.getEagleWorkingDatabasePath() == null) {
+            databaseFileService.prepareFinalDatabase(process);
+        }
+
         execution.setStatus(ProcedureExecutionStatus.RUNNING);
         execution.setStartedAt(OffsetDateTime.now());
         execution.setErrorMessage(null);
         process.setStatus(MigrationStatus.PROCEDURES_EM_EXECUCAO);
         try {
-            firebirdClient.executeProcedure(process.getMigratorDatabase(), execution.getProcedureName());
+            if (!shouldExecuteProcedure(process, execution.getProcedureName())) {
+                skipProcedure(execution);
+                return mapper.toProcedureResponse(execution);
+            }
+            executeFirebirdProcedure(process, execution.getProcedureName());
             execution.setStatus(ProcedureExecutionStatus.SUCCESS);
             execution.setFinishedAt(OffsetDateTime.now());
-            if (process.getProcedureExecutions().stream().allMatch(item -> item.getStatus() == ProcedureExecutionStatus.SUCCESS)) {
+            if (process.getProcedureExecutions().stream().allMatch(this::isTerminalSuccess)) {
                 process.setStatus(MigrationStatus.CONCLUIDO);
             }
         } catch (BusinessException exception) {
@@ -325,13 +364,21 @@ public class MigrationProcessService {
     }
 
     private void executeProcedureStep(MigrationProcessEntity process, ProcedureExecutionEntity execution) {
+        if (execution.getStatus() == ProcedureExecutionStatus.SUCCESS
+                && !"CONFIGURAR_MIGRACAO".equalsIgnoreCase(execution.getProcedureName())) {
+            return;
+        }
         execution.setStatus(ProcedureExecutionStatus.RUNNING);
         execution.setStartedAt(OffsetDateTime.now());
         execution.setFinishedAt(null);
         execution.setErrorMessage(null);
         process.setStatus(MigrationStatus.PROCEDURES_EM_EXECUCAO);
         try {
-            firebirdClient.executeProcedure(process.getMigratorDatabase(), execution.getProcedureName());
+            if (!shouldExecuteProcedure(process, execution.getProcedureName())) {
+                skipProcedure(execution);
+                return;
+            }
+            executeFirebirdProcedure(process, execution.getProcedureName());
             execution.setStatus(ProcedureExecutionStatus.SUCCESS);
             execution.setFinishedAt(OffsetDateTime.now());
         } catch (BusinessException exception) {
@@ -341,6 +388,76 @@ public class MigrationProcessService {
             process.setStatus(MigrationStatus.FALHOU);
             process.setLastError(exception.getMessage());
         }
+    }
+
+    private void resetProcedureExecutions(MigrationProcessEntity process) {
+        for (ProcedureExecutionEntity execution : process.getProcedureExecutions()) {
+            execution.setStatus(ProcedureExecutionStatus.PENDING);
+            execution.setStartedAt(null);
+            execution.setFinishedAt(null);
+            execution.setErrorMessage(null);
+        }
+    }
+
+    private void executeFirebirdProcedure(MigrationProcessEntity process, String procedureName) {
+        if ("CONFIGURAR_MIGRACAO".equalsIgnoreCase(procedureName)) {
+            firebirdClient.configurarMigracao(
+                    process.getMigratorDatabase(),
+                    process.getDefaultDistrictId(),
+                    process.getDefaultCep(),
+                    process.getCompanyState(),
+                    process.isMigrateReceivables() && hasSheet(process, MigrationModule.ARECEBER),
+                    hasSheet(process, MigrationModule.CLIENTES),
+                    hasSheet(process, MigrationModule.FORNECEDORES),
+                    false,
+                    false,
+                    hasSheet(process, MigrationModule.PRODUTOS),
+                    false,
+                    false);
+            return;
+        }
+        firebirdClient.executeProcedure(process.getMigratorDatabase(), procedureName);
+    }
+
+    private boolean shouldExecuteProcedure(MigrationProcessEntity process, String procedureName) {
+        String name = procedureName.toUpperCase();
+        return switch (name) {
+            case "MIGRAR_00_INICIAR" -> true;
+            case "MIGRAR_02_CLIENTES" -> hasSheet(process, MigrationModule.CLIENTES);
+            case "MIGRAR_03_FORNECEDORES" -> hasSheet(process, MigrationModule.FORNECEDORES);
+            case "MIGRAR_05_PRODUTOS" -> hasSheet(process, MigrationModule.PRODUTOS);
+            case "MIGRAR_14_ARECEBER" -> process.isMigrateReceivables() && hasSheet(process, MigrationModule.ARECEBER);
+            case "MIGRAR_15_APAGAR" -> hasSheet(process, MigrationModule.APAGAR);
+            default -> {
+                // Se for uma procedure entre 04 e 13, depende da planilha de produtos
+                if (name.startsWith("MIGRAR_")) {
+                    try {
+                        int code = Integer.parseInt(name.substring(7, 9));
+                        if (code >= 4 && code <= 13) {
+                            yield hasSheet(process, MigrationModule.PRODUTOS);
+                        }
+                    } catch (Exception e) {
+                        // Se nao conseguir ler o numero, deixa rodar por padrao
+                    }
+                }
+                yield true;
+            }
+        };
+    }
+
+    private void skipProcedure(ProcedureExecutionEntity execution) {
+        execution.setStatus(ProcedureExecutionStatus.SKIPPED);
+        execution.setFinishedAt(OffsetDateTime.now());
+        execution.setErrorMessage(null);
+    }
+
+    private boolean isTerminalSuccess(ProcedureExecutionEntity execution) {
+        return execution.getStatus() == ProcedureExecutionStatus.SUCCESS
+                || execution.getStatus() == ProcedureExecutionStatus.SKIPPED;
+    }
+
+    private boolean hasSheet(MigrationProcessEntity process, MigrationModule module) {
+        return process.getSheets().stream().anyMatch(sheet -> sheet.getModule() == module);
     }
 
     private MigrationStatus statusForSheet(ValidationResult validation) {

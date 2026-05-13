@@ -29,7 +29,7 @@ class MigrationDatabaseFileServiceTest {
     Path tempDir;
 
     @Test
-    @DisplayName("Should prepare working database from S3 template and publish final file to S3")
+    @DisplayName("Should prepare database from S3, publish final file and remove local database files")
     void shouldPrepareWorkingDatabaseFromS3AndPublishFinalFile() throws Exception {
         MigrationProperties properties = new MigrationProperties();
         properties.setWorkDir(tempDir.resolve("work").toString());
@@ -43,16 +43,21 @@ class MigrationDatabaseFileServiceTest {
 
         MigrationDatabaseFileService service = new MigrationDatabaseFileService(properties, s3Client());
         PreparedDatabase prepared = service.prepareFinalDatabase(process);
+        Path procedureDatabase = tempDir.resolve("work").resolve("EAGLEERP.FDB");
 
         assertThat(Files.readString(prepared.workingDatabasePath())).isEqualTo("banco-limpo");
+        assertThat(Files.readString(procedureDatabase)).isEqualTo("banco-limpo");
 
-        Files.writeString(prepared.workingDatabasePath(), "banco-migrado");
+        Files.writeString(procedureDatabase, "banco-migrado");
 
         String storageUri = service.publishFinalDatabase(prepared);
 
         assertThat(prepared.finalDatabaseFilename()).startsWith("cliente-teste-").endsWith(".FDB");
-        assertThat(Files.readString(prepared.finalDatabasePath())).isEqualTo("banco-migrado");
         assertThat(storageUri).startsWith("s3://eagle-final/bancos-migrados/2025.002/");
+        assertThat(prepared.finalDatabasePath()).doesNotExist();
+        assertThat(prepared.workingDatabasePath()).doesNotExist();
+        assertThat(procedureDatabase).doesNotExist();
+        assertThat(prepared.workingDatabasePath().getParent()).doesNotExist();
     }
 
     private S3Client s3Client() throws Exception {

@@ -38,7 +38,6 @@ public class MigrationLayoutRegistry {
                 field("BLOQUEADO", FieldType.TEXT, 1, false, "S ou N"),
                 field("OBS", FieldType.TEXT, 2048, false, "Observacoes"),
                 field("EMAIL", FieldType.TEXT, 50, false, "Email"),
-                field("EMAIL2", FieldType.TEXT, 50, false, "Email secundario"),
                 field("CONTATO", FieldType.TEXT, 50, false, "Contato"))));
 
         layouts.put(MigrationModule.FORNECEDORES, new LayoutSpec(MigrationModule.FORNECEDORES, "FORNECEDORES", "CODIGO", List.of(
@@ -63,7 +62,7 @@ public class MigrationLayoutRegistry {
                 field("EMAIL", FieldType.TEXT, 50, false, "Email"),
                 field("CONTATO", FieldType.TEXT, 50, false, "Contato"))));
 
-        layouts.put(MigrationModule.PRODUTOS, new LayoutSpec(MigrationModule.PRODUTOS, "ESTOQUE", "CODIGO", List.of(
+        layouts.put(MigrationModule.PRODUTOS, new LayoutSpec(MigrationModule.PRODUTOS, "PRODUTOS", "CODIGO", List.of(
                 field("CODIGO", FieldType.INTEGER, 10, true, "Codigo do produto"),
                 field("TIPO", FieldType.INTEGER, 2, true, "Tipo do item"),
                 field("PRODUTO", FieldType.TEXT, 100, true, "Nome do produto"),
@@ -78,7 +77,7 @@ public class MigrationLayoutRegistry {
                 field("COMISSAO", FieldType.MONETARY, 10, false, "Comissao"),
                 field("CODBARRA", FieldType.TEXT, 60, false, "Codigo de barras"),
                 field("ORIGEM", FieldType.INTEGER, 1, false, "Origem"),
-                field("CST", FieldType.INTEGER, 2, false, "CST ICMS"),
+                field("CST", FieldType.TEXT, 2, false, "CST ICMS"),
                 field("ICMS", FieldType.MONETARY, 4, false, "Aliquota ICMS"),
                 field("NUM_FABRIC", FieldType.TEXT, 60, false, "Codigo de fabrica"),
                 field("LOCALIZA", FieldType.TEXT, 50, false, "Localizacao"),
@@ -143,7 +142,17 @@ public class MigrationLayoutRegistry {
                 "MIGRAR_01_DISTRITO",
                 "MIGRAR_02_CLIENTES",
                 "MIGRAR_03_FORNECEDORES",
+                "MIGRAR_04_UNIDADES",
                 "MIGRAR_05_PRODUTOS",
+                "MIGRAR_06_REF",
+                "MIGRAR_07_CODFAB",
+                "MIGRAR_08_ICMS",
+                "MIGRAR_09_TABELA",
+                "MIGRAR_10_KARDEX",
+                "MIGRAR_10_KARDEX_NEGAT",
+                "MIGRAR_11_SUBGRUPO",
+                "MIGRAR_12_LOCALIZA",
+                "MIGRAR_13_MARCAS",
                 "MIGRAR_14_ARECEBER",
                 "MIGRAR_15_APAGAR",
                 "UTIL_RELATORIO_MIGRACAO");
