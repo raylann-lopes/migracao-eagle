@@ -66,12 +66,12 @@ docker-stack.portainer.yml
 
 5. Configure as variaveis do `.env.prod.example` no Portainer.
 
-Como a VPS ja usa Traefik, a stack nao publica `80` e `443` diretamente. Configure `TRAEFIK_NETWORK` com o nome da rede externa usada pelo Traefik.
+Como a VPS ja usa Traefik, a stack nao publica `80` e `443` diretamente. Configure `TRAEFIK_NETWORK` com o nome da rede externa usada pelo Traefik. No servidor atual, a rede encontrada e `wize-net`.
 
 Para descobrir o nome no servidor:
 
 ```bash
-docker network ls | grep -i traefik
+docker network ls
 ```
 
 Nao exponha publicamente as portas `3050`, `5432` ou `8080`. O acesso publico entra pelo Traefik.
