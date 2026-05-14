@@ -4,6 +4,7 @@ import com.example.demo.migration.domain.MigrationModule;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,6 +20,11 @@ import org.springframework.stereotype.Service;
 public class MigrationValidationService {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final List<DateTimeFormatter> ACCEPTED_DATE_FORMATS = List.of(
+            DATE_FORMAT,
+            DateTimeFormatter.ofPattern("d/M/yyyy"),
+            new DateTimeFormatterBuilder().appendPattern("M/d/").appendValueReduced(java.time.temporal.ChronoField.YEAR, 2, 2, 2000).toFormatter(),
+            DateTimeFormatter.ofPattern("M/d/yyyy"));
 
     private final MigrationLayoutRegistry layoutRegistry;
 
@@ -141,13 +147,16 @@ public class MigrationValidationService {
     }
 
     private String normalizeDate(String fieldName, String value, List<RowIssue> errors, int rowNumber) {
-        try {
-            LocalDate date = LocalDate.parse(value, DATE_FORMAT);
-            return DATE_FORMAT.format(date);
-        } catch (DateTimeParseException exception) {
-            errors.add(issue(rowNumber, fieldName, "Data deve estar no formato dd/mm/aaaa", "ERROR"));
-            return value;
+        for (DateTimeFormatter formatter : ACCEPTED_DATE_FORMATS) {
+            try {
+                LocalDate date = LocalDate.parse(value, formatter);
+                return DATE_FORMAT.format(date);
+            } catch (DateTimeParseException exception) {
+                // Tenta o proximo formato aceito.
+            }
         }
+        errors.add(issue(rowNumber, fieldName, "Data deve estar no formato dd/mm/aaaa", "ERROR"));
+        return value;
     }
 
     private void validateDomain(

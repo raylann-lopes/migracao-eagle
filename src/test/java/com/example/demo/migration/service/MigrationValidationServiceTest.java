@@ -114,6 +114,23 @@ class MigrationValidationServiceTest {
                 .containsEntry("VENCIMENTO", "10/05/2026");
     }
 
+    @Test
+    @DisplayName("Should normalize short US Excel dates in receivables")
+    void shouldNormalizeShortUsExcelDatesInReceivables() {
+        ValidationResult result = service.validate(MigrationModule.ARECEBER, data(MigrationModule.ARECEBER, List.of(
+                row(2, MigrationModule.ARECEBER, Map.of(
+                        "CODIGO", "1",
+                        "CLIENTES_ID", "1",
+                        "DOCUMENTO", "1",
+                        "EMISSAO", "20/02/2026",
+                        "VENCIMENTO", "5/30/26",
+                        "VALOR", "6273,40")))));
+
+        assertThat(result.errorCount()).isZero();
+        assertThat(result.rows().getFirst().normalizedValues())
+                .containsEntry("VENCIMENTO", "30/05/2026");
+    }
+
     private SpreadsheetData data(MigrationModule module, List<SheetRow> rows) {
         return new SpreadsheetData(headers(module), rows);
     }
