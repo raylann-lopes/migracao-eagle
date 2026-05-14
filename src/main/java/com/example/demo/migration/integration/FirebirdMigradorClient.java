@@ -3,15 +3,19 @@ package com.example.demo.migration.integration;
 import com.example.demo.migration.config.MigrationProperties;
 import com.example.demo.migration.domain.MigrationModule;
 import com.example.demo.migration.exception.BusinessException;
+import com.example.demo.migration.service.FieldSpec;
 import com.example.demo.migration.service.LayoutSpec;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
@@ -34,19 +38,20 @@ public class FirebirdMigradorClient {
         validateSqlIdentifier(tableName);
         layout.fields().forEach(field -> validateSqlIdentifier(field.name()));
 
-        String columns = layout.fields().stream().map(FieldSpecSql::quoted).collect(Collectors.joining(", "));
-        String placeholders = layout.fields().stream().map(field -> "?").collect(Collectors.joining(", "));
-        String sql = "INSERT INTO " + quoted(tableName) + " (" + columns + ") VALUES (" + placeholders + ")";
-
         try (Connection connection = connection(migratorDatabase)) {
+            List<FieldSpec> importFields = importableFields(connection, tableName, layout);
+            String columns = importFields.stream().map(FieldSpecSql::quoted).collect(Collectors.joining(", "));
+            String placeholders = importFields.stream().map(field -> "?").collect(Collectors.joining(", "));
+            String sql = "INSERT INTO " + quoted(tableName) + " (" + columns + ") VALUES (" + placeholders + ")";
+
             connection.setAutoCommit(false);
             try (Statement statement = connection.createStatement()) {
                 statement.executeUpdate("DELETE FROM " + quoted(tableName));
             }
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 for (Map<String, String> row : rows) {
-                    for (int index = 0; index < layout.fields().size(); index++) {
-                        statement.setString(index + 1, row.get(layout.fields().get(index).name()));
+                    for (int index = 0; index < importFields.size(); index++) {
+                        statement.setString(index + 1, row.get(importFields.get(index).name()));
                     }
                     statement.addBatch();
                 }
@@ -65,6 +70,39 @@ public class FirebirdMigradorClient {
             }
         } catch (SQLException exception) {
             throw new BusinessException("Falha ao importar para o MIGRADOR: " + exception.getMessage(), exception);
+        }
+    }
+
+    private List<FieldSpec> importableFields(Connection connection, String tableName, LayoutSpec layout) throws SQLException {
+        Set<String> tableColumns = tableColumns(connection, tableName);
+        List<FieldSpec> fields = layout.fields().stream()
+                .filter(field -> tableColumns.contains(field.name().toUpperCase(Locale.ROOT)))
+                .toList();
+        if (fields.isEmpty()) {
+            throw new BusinessException("Tabela " + tableName + " nao possui colunas compativeis com o layout " + layout.module() + ".");
+        }
+        return fields;
+    }
+
+    private Set<String> tableColumns(Connection connection, String tableName) throws SQLException {
+        String sql = """
+                select trim(rf.rdb$field_name) as column_name
+                from rdb$relation_fields rf
+                where upper(trim(rf.rdb$relation_name)) = ?
+                order by rf.rdb$field_position
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, tableName.toUpperCase(Locale.ROOT));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                Set<String> columns = new java.util.LinkedHashSet<>();
+                while (resultSet.next()) {
+                    columns.add(resultSet.getString("column_name").toUpperCase(Locale.ROOT));
+                }
+                if (columns.isEmpty()) {
+                    throw new BusinessException("Tabela " + tableName + " nao encontrada no banco MIGRADOR.");
+                }
+                return columns;
+            }
         }
     }
 

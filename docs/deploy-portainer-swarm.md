@@ -17,6 +17,12 @@ eagle.wizeflowsolutions.cloud
 
 ## Arquivos no servidor
 
+Para um passo a passo completo de preparacao do Firebird no Linux, incluindo upload do `MIGRADOR.FDB`, permissoes e alias `EAGLEERP`, veja:
+
+```text
+docs/firebird-linux-setup.md
+```
+
 Antes de subir a stack, prepare a pasta usada pelo Firebird:
 
 ```bash
