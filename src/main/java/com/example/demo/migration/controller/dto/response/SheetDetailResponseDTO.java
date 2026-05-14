@@ -1,12 +1,12 @@
-package com.example.demo.migration.controller.dto;
+package com.example.demo.migration.controller.dto.response;
 
 import com.example.demo.migration.domain.MigrationModule;
 import java.util.List;
 import java.util.Map;
 
-public record SheetDetailResponse(
+public record SheetDetailResponseDTO(
         MigrationModule module,
-        SheetSummaryResponse summary,
+        SheetSummaryResponseDTO summary,
         List<Map<String, String>> previewRows,
-        List<RowIssueResponse> issues) {
+        List<RowIssueResponseDTO> issues) {
 }

@@ -1,11 +1,11 @@
 package com.example.demo.migration.service;
 
-import com.example.demo.migration.controller.dto.LayoutFieldResponse;
-import com.example.demo.migration.controller.dto.LayoutResponse;
-import com.example.demo.migration.controller.dto.MigrationConfigResponse;
-import com.example.demo.migration.controller.dto.MigrationProcessResponse;
-import com.example.demo.migration.controller.dto.ProcedureExecutionResponse;
-import com.example.demo.migration.controller.dto.SheetSummaryResponse;
+import com.example.demo.migration.controller.dto.response.LayoutFieldResponseDTO;
+import com.example.demo.migration.controller.dto.response.LayoutResponseDTO;
+import com.example.demo.migration.controller.dto.response.MigrationConfigResponseDTO;
+import com.example.demo.migration.controller.dto.response.MigrationProcessResponseDTO;
+import com.example.demo.migration.controller.dto.response.ProcedureExecutionResponseDTO;
+import com.example.demo.migration.controller.dto.response.SheetSummaryResponseDTO;
 import com.example.demo.migration.domain.MigrationProcessEntity;
 import com.example.demo.migration.domain.MigrationSheetEntity;
 import com.example.demo.migration.domain.ProcedureExecutionEntity;
@@ -15,8 +15,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class MigrationMapper {
 
-    public MigrationProcessResponse toResponse(MigrationProcessEntity process) {
-        return new MigrationProcessResponse(
+    public MigrationProcessResponseDTO toResponse(MigrationProcessEntity process) {
+        return new MigrationProcessResponseDTO(
                 process.getId(),
                 process.getClientName(),
                 process.getCnpj(),
@@ -26,7 +26,7 @@ public class MigrationMapper {
                 process.getFinalDatabaseFilename(),
                 process.getFinalDatabasePath() != null,
                 process.getStatus(),
-                new MigrationConfigResponse(
+                new MigrationConfigResponseDTO(
                         process.getDefaultDistrictId(),
                         process.getDefaultCep(),
                         process.getCompanyState(),
@@ -44,8 +44,8 @@ public class MigrationMapper {
                 process.getUpdatedAt());
     }
 
-    public SheetSummaryResponse toSheetSummary(MigrationSheetEntity sheet) {
-        return new SheetSummaryResponse(
+    public SheetSummaryResponseDTO toSheetSummary(MigrationSheetEntity sheet) {
+        return new SheetSummaryResponseDTO(
                 sheet.getId(),
                 sheet.getModule(),
                 sheet.getStatus(),
@@ -59,8 +59,8 @@ public class MigrationMapper {
                 sheet.getImportedAt());
     }
 
-    public ProcedureExecutionResponse toProcedureResponse(ProcedureExecutionEntity execution) {
-        return new ProcedureExecutionResponse(
+    public ProcedureExecutionResponseDTO toProcedureResponse(ProcedureExecutionEntity execution) {
+        return new ProcedureExecutionResponseDTO(
                 execution.getId(),
                 execution.getStepOrder(),
                 execution.getProcedureName(),
@@ -70,12 +70,12 @@ public class MigrationMapper {
                 execution.getErrorMessage());
     }
 
-    public LayoutResponse toLayoutResponse(LayoutSpec layout) {
-        return new LayoutResponse(
+    public LayoutResponseDTO toLayoutResponseDTO(LayoutSpec layout) {
+        return new LayoutResponseDTO(
                 layout.module(),
                 layout.targetTable(),
                 layout.fields().stream()
-                        .map(field -> new LayoutFieldResponse(
+                        .map(field -> new LayoutFieldResponseDTO(
                                 field.name(),
                                 field.type(),
                                 field.maxLength(),

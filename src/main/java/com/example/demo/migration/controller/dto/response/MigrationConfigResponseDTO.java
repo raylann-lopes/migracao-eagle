@@ -1,6 +1,6 @@
-package com.example.demo.migration.controller.dto;
+package com.example.demo.migration.controller.dto.response;
 
-public record MigrationConfigResponse(
+public record MigrationConfigResponseDTO(
         Integer defaultDistrictId,
         String defaultCep,
         String companyState,

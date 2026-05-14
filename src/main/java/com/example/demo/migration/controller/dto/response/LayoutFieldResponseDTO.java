@@ -1,8 +1,8 @@
-package com.example.demo.migration.controller.dto;
+package com.example.demo.migration.controller.dto.response;
 
 import com.example.demo.migration.domain.FieldType;
 
-public record LayoutFieldResponse(
+public record LayoutFieldResponseDTO(
         String name,
         FieldType type,
         int maxLength,

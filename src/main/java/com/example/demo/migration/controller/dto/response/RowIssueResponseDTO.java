@@ -1,6 +1,6 @@
-package com.example.demo.migration.controller.dto;
+package com.example.demo.migration.controller.dto.response;
 
-public record RowIssueResponse(
+public record RowIssueResponseDTO(
         int rowNumber,
         String field,
         String message,

@@ -1,11 +1,11 @@
-package com.example.demo.migration.controller.dto;
+package com.example.demo.migration.controller.dto.response;
 
 import com.example.demo.migration.domain.MigrationModule;
 import com.example.demo.migration.domain.MigrationStatus;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-public record SheetSummaryResponse(
+public record SheetSummaryResponseDTO(
         UUID id,
         MigrationModule module,
         MigrationStatus status,

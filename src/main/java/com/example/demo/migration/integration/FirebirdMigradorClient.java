@@ -1,17 +1,23 @@
 package com.example.demo.migration.integration;
 
 import com.example.demo.migration.config.MigrationProperties;
+import com.example.demo.migration.domain.FieldType;
 import com.example.demo.migration.domain.MigrationModule;
 import com.example.demo.migration.exception.BusinessException;
 import com.example.demo.migration.service.FieldSpec;
 import com.example.demo.migration.service.LayoutSpec;
+import java.math.BigDecimal;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -21,6 +27,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class FirebirdMigradorClient {
+
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final MigrationProperties properties;
 
@@ -51,7 +59,7 @@ public class FirebirdMigradorClient {
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 for (Map<String, String> row : rows) {
                     for (int index = 0; index < importFields.size(); index++) {
-                        statement.setString(index + 1, row.get(importFields.get(index).name()));
+                        bindValue(statement, index + 1, importFields.get(index), row.get(importFields.get(index).name()));
                     }
                     statement.addBatch();
                 }
@@ -64,13 +72,39 @@ public class FirebirdMigradorClient {
                     }
                 }
                 return total;
-            } catch (SQLException exception) {
+            } catch (SQLException | RuntimeException exception) {
                 connection.rollback();
                 throw exception;
             }
         } catch (SQLException exception) {
             throw new BusinessException("Falha ao importar para o MIGRADOR: " + exception.getMessage(), exception);
         }
+    }
+
+    private void bindValue(PreparedStatement statement, int parameterIndex, FieldSpec field, String value) throws SQLException {
+        if (value == null || value.isBlank()) {
+            statement.setNull(parameterIndex, sqlType(field.type()));
+            return;
+        }
+        try {
+            switch (field.type()) {
+                case INTEGER -> statement.setLong(parameterIndex, Long.parseLong(value));
+                case MONETARY -> statement.setBigDecimal(parameterIndex, new BigDecimal(value));
+                case DATE -> statement.setDate(parameterIndex, Date.valueOf(LocalDate.parse(value, DATE_FORMAT)));
+                case TEXT -> statement.setString(parameterIndex, value);
+            }
+        } catch (DateTimeParseException | NumberFormatException exception) {
+            throw new BusinessException("Valor invalido para " + field.name() + ": " + value, exception);
+        }
+    }
+
+    private int sqlType(FieldType fieldType) {
+        return switch (fieldType) {
+            case INTEGER -> Types.BIGINT;
+            case MONETARY -> Types.NUMERIC;
+            case DATE -> Types.DATE;
+            case TEXT -> Types.VARCHAR;
+        };
     }
 
     private List<FieldSpec> importableFields(Connection connection, String tableName, LayoutSpec layout) throws SQLException {

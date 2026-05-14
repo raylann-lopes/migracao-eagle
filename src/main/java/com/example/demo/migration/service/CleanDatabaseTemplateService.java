@@ -1,7 +1,7 @@
 package com.example.demo.migration.service;
 
 import com.example.demo.migration.config.MigrationProperties;
-import com.example.demo.migration.controller.dto.CleanDatabaseTemplateResponse;
+import com.example.demo.migration.controller.dto.response.CleanDatabaseTemplateResponseDTO;
 import com.example.demo.migration.exception.BusinessException;
 import java.util.Comparator;
 import java.util.List;
@@ -16,10 +16,10 @@ public class CleanDatabaseTemplateService {
         this.properties = properties;
     }
 
-    public List<CleanDatabaseTemplateResponse> list() {
-        List<CleanDatabaseTemplateResponse> templates = properties.getCleanDatabase().getTemplates().stream()
+    public List<CleanDatabaseTemplateResponseDTO> list() {
+        List<CleanDatabaseTemplateResponseDTO> templates = properties.getCleanDatabase().getTemplates().stream()
                 .map(this::toResponse)
-                .sorted(Comparator.comparing(CleanDatabaseTemplateResponse::version))
+                .sorted(Comparator.comparing(CleanDatabaseTemplateResponseDTO::version))
                 .toList();
         if (!templates.isEmpty()) {
             return templates;
@@ -42,11 +42,11 @@ public class CleanDatabaseTemplateService {
                 .orElseThrow(() -> new BusinessException("Banco limpo da versao " + version + " nao configurado no ambiente."));
     }
 
-    private CleanDatabaseTemplateResponse toResponse(MigrationProperties.Template template) {
+    private CleanDatabaseTemplateResponseDTO toResponse(MigrationProperties.Template template) {
         String description = isBlank(template.getDescription())
                 ? "Eagle Gestao " + template.getVersion()
                 : template.getDescription();
-        return new CleanDatabaseTemplateResponse(template.getVersion(), description);
+        return new CleanDatabaseTemplateResponseDTO(template.getVersion(), description);
     }
 
     private String storageUri(MigrationProperties.Template template) {

@@ -1,10 +1,10 @@
-package com.example.demo.migration.controller.dto;
+package com.example.demo.migration.controller.dto.response;
 
 import com.example.demo.migration.domain.ProcedureExecutionStatus;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-public record ProcedureExecutionResponse(
+public record ProcedureExecutionResponseDTO(
         UUID id,
         int stepOrder,
         String procedureName,

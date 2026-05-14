@@ -1,11 +1,11 @@
 package com.example.demo.migration.controller;
 
-import com.example.demo.migration.controller.dto.CleanDatabaseTemplateResponse;
-import com.example.demo.migration.controller.dto.CreateMigrationProcessRequest;
-import com.example.demo.migration.controller.dto.LayoutResponse;
-import com.example.demo.migration.controller.dto.MigrationProcessResponse;
-import com.example.demo.migration.controller.dto.ProcedureExecutionResponse;
-import com.example.demo.migration.controller.dto.SheetDetailResponse;
+import com.example.demo.migration.controller.dto.response.CleanDatabaseTemplateResponseDTO;
+import com.example.demo.migration.controller.dto.request.CreateMigrationProcessRequestDTO;
+import com.example.demo.migration.controller.dto.response.LayoutResponseDTO;
+import com.example.demo.migration.controller.dto.response.MigrationProcessResponseDTO;
+import com.example.demo.migration.controller.dto.response.ProcedureExecutionResponseDTO;
+import com.example.demo.migration.controller.dto.response.SheetDetailResponseDTO;
 import com.example.demo.migration.domain.MigrationModule;
 import com.example.demo.migration.service.CleanDatabaseTemplateService;
 import com.example.demo.migration.service.MigrationLayoutRegistry;
@@ -50,22 +50,22 @@ public class MigrationController {
     }
 
     @PostMapping("/migration-processes")
-    public ResponseEntity<MigrationProcessResponse> create(@Valid @RequestBody CreateMigrationProcessRequest request) {
+    public ResponseEntity<MigrationProcessResponseDTO> create(@Valid @RequestBody CreateMigrationProcessRequestDTO request) {
         return ResponseEntity.ok(processService.create(request));
     }
 
     @GetMapping("/migration-processes")
-    public List<MigrationProcessResponse> list() {
+    public List<MigrationProcessResponseDTO> list() {
         return processService.list();
     }
 
     @GetMapping("/migration-processes/{processId}")
-    public MigrationProcessResponse get(@PathVariable UUID processId) {
+    public MigrationProcessResponseDTO get(@PathVariable UUID processId) {
         return processService.get(processId);
     }
 
     @PostMapping(value = "/migration-processes/{processId}/sheets/{module}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public SheetDetailResponse uploadSheet(
+    public SheetDetailResponseDTO uploadSheet(
             @PathVariable UUID processId,
             @PathVariable MigrationModule module,
             @RequestParam("file") MultipartFile file) {
@@ -73,7 +73,7 @@ public class MigrationController {
     }
 
     @GetMapping("/migration-processes/{processId}/sheets/{module}")
-    public SheetDetailResponse getSheet(@PathVariable UUID processId, @PathVariable MigrationModule module) {
+    public SheetDetailResponseDTO getSheet(@PathVariable UUID processId, @PathVariable MigrationModule module) {
         return processService.getSheet(processId, module);
     }
 
@@ -88,12 +88,12 @@ public class MigrationController {
     }
 
     @PostMapping("/migration-processes/{processId}/import-migrador")
-    public MigrationProcessResponse importMigrador(@PathVariable UUID processId) {
+    public MigrationProcessResponseDTO importMigrador(@PathVariable UUID processId) {
         return processService.importValidSheets(processId);
     }
 
     @PostMapping("/migration-processes/{processId}/run-complete")
-    public MigrationProcessResponse runComplete(@PathVariable UUID processId) {
+    public MigrationProcessResponseDTO runComplete(@PathVariable UUID processId) {
         return processService.runCompleteMigration(processId);
     }
 
@@ -107,24 +107,24 @@ public class MigrationController {
     }
 
     @PostMapping("/migration-processes/{processId}/procedures/execute-next")
-    public ProcedureExecutionResponse executeNextProcedure(@PathVariable UUID processId) {
+    public ProcedureExecutionResponseDTO executeNextProcedure(@PathVariable UUID processId) {
         return processService.executeNextProcedure(processId);
     }
 
     @PostMapping("/migration-processes/{processId}/procedures/{procedureName}/execute")
-    public ProcedureExecutionResponse executeProcedure(
+    public ProcedureExecutionResponseDTO executeProcedure(
             @PathVariable UUID processId,
             @PathVariable String procedureName) {
         return processService.executeProcedure(processId, procedureName);
     }
 
     @GetMapping("/migration-layouts")
-    public List<LayoutResponse> layouts() {
-        return layoutRegistry.all().stream().map(mapper::toLayoutResponse).toList();
+    public List<LayoutResponseDTO> layouts() {
+        return layoutRegistry.all().stream().map(mapper::toLayoutResponseDTO).toList();
     }
 
     @GetMapping("/clean-database-templates")
-    public List<CleanDatabaseTemplateResponse> cleanDatabaseTemplates() {
+    public List<CleanDatabaseTemplateResponseDTO> cleanDatabaseTemplates() {
         return cleanDatabaseTemplateService.list();
     }
 }

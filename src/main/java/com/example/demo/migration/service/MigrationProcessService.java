@@ -1,10 +1,10 @@
 package com.example.demo.migration.service;
 
-import com.example.demo.migration.controller.dto.CreateMigrationProcessRequest;
-import com.example.demo.migration.controller.dto.MigrationProcessResponse;
-import com.example.demo.migration.controller.dto.ProcedureExecutionResponse;
-import com.example.demo.migration.controller.dto.RowIssueResponse;
-import com.example.demo.migration.controller.dto.SheetDetailResponse;
+import com.example.demo.migration.controller.dto.request.CreateMigrationProcessRequestDTO;
+import com.example.demo.migration.controller.dto.response.MigrationProcessResponseDTO;
+import com.example.demo.migration.controller.dto.response.ProcedureExecutionResponseDTO;
+import com.example.demo.migration.controller.dto.response.RowIssueResponseDTO;
+import com.example.demo.migration.controller.dto.response.SheetDetailResponseDTO;
 import com.example.demo.migration.config.MigrationProperties;
 import com.example.demo.migration.domain.MigrationModule;
 import com.example.demo.migration.domain.MigrationProcessEntity;
@@ -78,7 +78,7 @@ public class MigrationProcessService {
     }
 
     @Transactional
-    public MigrationProcessResponse create(CreateMigrationProcessRequest request) {
+    public MigrationProcessResponseDTO create(CreateMigrationProcessRequestDTO request) {
         MigrationProcessEntity process = new MigrationProcessEntity();
         process.setClientName(request.clientName().trim());
         process.setCnpj(normalizeDocument(request.cnpj()));
@@ -113,7 +113,7 @@ public class MigrationProcessService {
     }
 
     @Transactional(readOnly = true)
-    public List<MigrationProcessResponse> list() {
+    public List<MigrationProcessResponseDTO> list() {
         return processRepository.findAll().stream()
                 .sorted(Comparator.comparing(MigrationProcessEntity::getCreatedAt).reversed())
                 .map(mapper::toResponse)
@@ -121,12 +121,12 @@ public class MigrationProcessService {
     }
 
     @Transactional(readOnly = true)
-    public MigrationProcessResponse get(UUID processId) {
+    public MigrationProcessResponseDTO get(UUID processId) {
         return mapper.toResponse(getProcess(processId));
     }
 
     @Transactional
-    public SheetDetailResponse uploadSheet(UUID processId, MigrationModule module, MultipartFile file) {
+    public SheetDetailResponseDTO uploadSheet(UUID processId, MigrationModule module, MultipartFile file) {
         if (file.isEmpty()) {
             throw new BusinessException("Arquivo vazio.");
         }
@@ -177,14 +177,14 @@ public class MigrationProcessService {
     }
 
     @Transactional(readOnly = true)
-    public SheetDetailResponse getSheet(UUID processId, MigrationModule module) {
+    public SheetDetailResponseDTO getSheet(UUID processId, MigrationModule module) {
         MigrationSheetEntity sheet = sheetRepository.findByProcessIdAndModule(processId, module)
                 .orElseThrow(() -> new ResourceNotFoundException("Planilha nao encontrada para " + module));
         return toSheetDetail(sheet, 100);
     }
 
     @Transactional
-    public MigrationProcessResponse importValidSheets(UUID processId) {
+    public MigrationProcessResponseDTO importValidSheets(UUID processId) {
         MigrationProcessEntity process = getProcess(processId);
         List<MigrationSheetEntity> sheets = process.getSheets();
         if (sheets.isEmpty()) {
@@ -204,7 +204,7 @@ public class MigrationProcessService {
     }
 
     @Transactional
-    public ProcedureExecutionResponse executeNextProcedure(UUID processId) {
+    public ProcedureExecutionResponseDTO executeNextProcedure(UUID processId) {
         MigrationProcessEntity process = getProcess(processId);
         ProcedureExecutionEntity execution = procedureRepository
                 .findFirstByProcessIdAndStatusOrderByStepOrder(processId, ProcedureExecutionStatus.PENDING)
@@ -213,7 +213,7 @@ public class MigrationProcessService {
     }
 
     @Transactional
-    public MigrationProcessResponse runCompleteMigration(UUID processId) {
+    public MigrationProcessResponseDTO runCompleteMigration(UUID processId) {
         MigrationProcessEntity process = getProcess(processId);
         try {
             // Atualiza o caminho do banco limpo caso a configuracao tenha mudado
@@ -261,7 +261,7 @@ public class MigrationProcessService {
     }
 
     @Transactional
-    public ProcedureExecutionResponse executeProcedure(UUID processId, String procedureName) {
+    public ProcedureExecutionResponseDTO executeProcedure(UUID processId, String procedureName) {
         MigrationProcessEntity process = getProcess(processId);
         ProcedureExecutionEntity execution = process.getProcedureExecutions().stream()
                 .filter(item -> item.getProcedureName().equalsIgnoreCase(procedureName))
@@ -275,7 +275,7 @@ public class MigrationProcessService {
         MigrationSheetEntity sheet = sheetRepository.findByProcessIdAndModule(processId, module)
                 .orElseThrow(() -> new ResourceNotFoundException("Planilha nao encontrada para " + module));
         StringBuilder builder = new StringBuilder("linha,campo,severidade,mensagem\n");
-        for (RowIssueResponse issue : collectIssues(sheet)) {
+        for (RowIssueResponseDTO issue : collectIssues(sheet)) {
             builder.append(issue.rowNumber()).append(',')
                     .append(csv(issue.field())).append(',')
                     .append(issue.severity()).append(',')
@@ -298,7 +298,7 @@ public class MigrationProcessService {
         return process.getFinalDatabaseFilename();
     }
 
-    private ProcedureExecutionResponse executeProcedure(MigrationProcessEntity process, ProcedureExecutionEntity execution) {
+    private ProcedureExecutionResponseDTO executeProcedure(MigrationProcessEntity process, ProcedureExecutionEntity execution) {
         if (process.getStatus() != MigrationStatus.IMPORTADO_MIGRADOR
                 && process.getStatus() != MigrationStatus.PROCEDURES_EM_EXECUCAO
                 && process.getStatus() != MigrationStatus.FALHOU) {
@@ -483,8 +483,8 @@ public class MigrationProcessService {
         return MigrationStatus.PADRONIZADO;
     }
 
-    private SheetDetailResponse toSheetDetail(MigrationSheetEntity sheet, int previewLimit) {
-        return new SheetDetailResponse(
+    private SheetDetailResponseDTO toSheetDetail(MigrationSheetEntity sheet, int previewLimit) {
+        return new SheetDetailResponseDTO(
                 sheet.getModule(),
                 mapper.toSheetSummary(sheet),
                 previewRows(sheet, previewLimit),
@@ -500,14 +500,14 @@ public class MigrationProcessService {
                 .toList();
     }
 
-    private List<RowIssueResponse> collectIssues(MigrationSheetEntity sheet) {
-        List<RowIssueResponse> issues = new ArrayList<>();
+    private List<RowIssueResponseDTO> collectIssues(MigrationSheetEntity sheet) {
+        List<RowIssueResponseDTO> issues = new ArrayList<>();
         for (MigrationRowEntity row : sheet.getRows()) {
             issues.addAll(readIssues(row.getErrorsJson()));
             issues.addAll(readIssues(row.getWarningsJson()));
         }
         return issues.stream()
-                .sorted(Comparator.comparingInt(RowIssueResponse::rowNumber))
+                .sorted(Comparator.comparingInt(RowIssueResponseDTO::rowNumber))
                 .toList();
     }
 
@@ -560,7 +560,7 @@ public class MigrationProcessService {
         }
     }
 
-    private List<RowIssueResponse> readIssues(String json) {
+    private List<RowIssueResponseDTO> readIssues(String json) {
         if (json == null || json.isBlank()) {
             return List.of();
         }
@@ -568,7 +568,7 @@ public class MigrationProcessService {
             List<RowIssue> issues = objectMapper.readValue(json, new TypeReference<>() {
             });
             return issues.stream()
-                    .map(issue -> new RowIssueResponse(issue.rowNumber(), issue.field(), issue.message(), issue.severity()))
+                    .map(issue -> new RowIssueResponseDTO(issue.rowNumber(), issue.field(), issue.message(), issue.severity()))
                     .toList();
         } catch (JsonProcessingException exception) {
             throw new BusinessException("Falha ao ler inconsistencias da planilha.", exception);

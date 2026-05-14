@@ -1,11 +1,11 @@
-package com.example.demo.migration.controller.dto;
+package com.example.demo.migration.controller.dto.response;
 
 import com.example.demo.migration.domain.MigrationStatus;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-public record MigrationProcessResponse(
+public record MigrationProcessResponseDTO(
         UUID id,
         String clientName,
         String cnpj,
@@ -15,9 +15,9 @@ public record MigrationProcessResponse(
         String finalDatabaseFilename,
         boolean finalDatabaseAvailable,
         MigrationStatus status,
-        MigrationConfigResponse config,
-        List<SheetSummaryResponse> sheets,
-        List<ProcedureExecutionResponse> procedures,
+        MigrationConfigResponseDTO config,
+        List<SheetSummaryResponseDTO> sheets,
+        List<ProcedureExecutionResponseDTO> procedures,
         String lastError,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {

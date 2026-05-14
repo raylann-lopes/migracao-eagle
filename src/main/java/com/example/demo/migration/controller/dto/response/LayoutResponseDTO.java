@@ -1,10 +1,10 @@
-package com.example.demo.migration.controller.dto;
+package com.example.demo.migration.controller.dto.response;
 
 import com.example.demo.migration.domain.MigrationModule;
 import java.util.List;
 
-public record LayoutResponse(
+public record LayoutResponseDTO(
         MigrationModule module,
         String targetTable,
-        List<LayoutFieldResponse> fields) {
+        List<LayoutFieldResponseDTO> fields) {
 }
