@@ -39,9 +39,9 @@ create table migration_rows (
     sheet_id uuid not null,
     row_number integer not null,
     valid boolean not null,
-    normalized_json clob not null,
-    errors_json clob,
-    warnings_json clob,
+    normalized_json text not null,
+    errors_json text,
+    warnings_json text,
     constraint fk_migration_rows_sheet foreign key (sheet_id) references migration_sheets(id)
 );
 

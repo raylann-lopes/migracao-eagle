@@ -5,7 +5,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.UUID;
@@ -27,14 +26,13 @@ public class MigrationRowEntity {
     @Column(nullable = false)
     private boolean valid;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "text")
     private String normalizedJson;
 
-    @Lob
+    @Column(columnDefinition = "text")
     private String errorsJson;
 
-    @Lob
+    @Column(columnDefinition = "text")
     private String warningsJson;
 
     public UUID getId() {
