@@ -28,10 +28,11 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -49,6 +50,7 @@ public class MigrationProcessService {
     private final MigrationDatabaseFileService databaseFileService;
     private final CleanDatabaseTemplateService cleanDatabaseTemplateService;
     private final MigrationProperties properties;
+    private final TransactionTemplate transactionTemplate;
 
     public MigrationProcessService(
             MigrationProcessRepository processRepository,
@@ -62,7 +64,8 @@ public class MigrationProcessService {
             FirebirdMigradorClient firebirdClient,
             MigrationDatabaseFileService databaseFileService,
             CleanDatabaseTemplateService cleanDatabaseTemplateService,
-            MigrationProperties properties) {
+            MigrationProperties properties,
+            PlatformTransactionManager transactionManager) {
         this.processRepository = processRepository;
         this.sheetRepository = sheetRepository;
         this.procedureRepository = procedureRepository;
@@ -75,6 +78,7 @@ public class MigrationProcessService {
         this.databaseFileService = databaseFileService;
         this.cleanDatabaseTemplateService = cleanDatabaseTemplateService;
         this.properties = properties;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Transactional
@@ -95,23 +99,6 @@ public class MigrationProcessService {
         return mapper.toResponse(processRepository.save(process));
     }
 
-    private void runSetupProcedures(MigrationProcessEntity process) {
-        for (ProcedureExecutionEntity execution : process.getProcedureExecutions()) {
-            if (execution.getProcedureName().startsWith("UTIL_")) {
-                try {
-                    firebirdClient.executeProcedure(process.getMigratorDatabase(), execution.getProcedureName());
-                    execution.setStatus(ProcedureExecutionStatus.SUCCESS);
-                    execution.setStartedAt(OffsetDateTime.now());
-                    execution.setFinishedAt(OffsetDateTime.now());
-                } catch (Exception e) {
-                    execution.setStatus(ProcedureExecutionStatus.FAILED);
-                    execution.setErrorMessage("Falha no setup inicial: " + e.getMessage());
-                    // Não travamos a criação se o setup falhar, mas o status ficará visível
-                }
-            }
-        }
-    }
-
     @Transactional(readOnly = true)
     public List<MigrationProcessResponseDTO> list() {
         return processRepository.findAll().stream()
@@ -121,12 +108,12 @@ public class MigrationProcessService {
     }
 
     @Transactional(readOnly = true)
-    public MigrationProcessResponseDTO get(UUID processId) {
+    public MigrationProcessResponseDTO get(Long processId) {
         return mapper.toResponse(getProcess(processId));
     }
 
     @Transactional
-    public SheetDetailResponseDTO uploadSheet(UUID processId, MigrationModule module, MultipartFile file) {
+    public SheetDetailResponseDTO uploadSheet(Long processId, MigrationModule module, MultipartFile file) {
         if (file.isEmpty()) {
             throw new BusinessException("Arquivo vazio.");
         }
@@ -177,14 +164,14 @@ public class MigrationProcessService {
     }
 
     @Transactional(readOnly = true)
-    public SheetDetailResponseDTO getSheet(UUID processId, MigrationModule module) {
+    public SheetDetailResponseDTO getSheet(Long processId, MigrationModule module) {
         MigrationSheetEntity sheet = sheetRepository.findByProcessIdAndModule(processId, module)
                 .orElseThrow(() -> new ResourceNotFoundException("Planilha nao encontrada para " + module));
         return toSheetDetail(sheet, 100);
     }
 
     @Transactional
-    public MigrationProcessResponseDTO importValidSheets(UUID processId) {
+    public MigrationProcessResponseDTO importValidSheets(Long processId) {
         MigrationProcessEntity process = getProcess(processId);
         List<MigrationSheetEntity> sheets = process.getSheets();
         if (sheets.isEmpty()) {
@@ -204,7 +191,7 @@ public class MigrationProcessService {
     }
 
     @Transactional
-    public ProcedureExecutionResponseDTO executeNextProcedure(UUID processId) {
+    public ProcedureExecutionResponseDTO executeNextProcedure(Long processId) {
         MigrationProcessEntity process = getProcess(processId);
         ProcedureExecutionEntity execution = procedureRepository
                 .findFirstByProcessIdAndStatusOrderByStepOrder(processId, ProcedureExecutionStatus.PENDING)
@@ -212,56 +199,36 @@ public class MigrationProcessService {
         return executeProcedure(process, execution);
     }
 
-    @Transactional
-    public MigrationProcessResponseDTO runCompleteMigration(UUID processId) {
-        MigrationProcessEntity process = getProcess(processId);
+    public MigrationProcessResponseDTO runCompleteMigration(Long processId) {
         try {
-            // Atualiza o caminho do banco limpo caso a configuracao tenha mudado
-            process.setCleanDatabasePath(cleanDatabaseTemplateService.templateReferenceForVersion(process.getEagleVersion()));
-
-            validateReadyForFullMigration(process);
             firebirdClient.assertEnabledForFullMigration();
 
+            MigrationProcessEntity process = prepareProcessForFullMigration(processId);
             PreparedDatabase preparedDatabase = databaseFileService.prepareFinalDatabase(process);
-            process.setEagleWorkingDatabasePath(preparedDatabase.workingDatabasePath().toString());
-            process.setFinalDatabasePath(null);
-            process.setFinalDatabaseFilename(null);
-            resetProcedureExecutions(process);
-
-            // Força o flush para garantir que o caminho do banco de trabalho esteja salvo
-            processRepository.saveAndFlush(process);
+            storePreparedDatabase(processId, preparedDatabase);
 
             // Aguarda um pequeno instante para o Docker/File System sincronizar
             try { Thread.sleep(1000); } catch (InterruptedException e) {}
             firebirdClient.assertEagleAliasAvailable();
 
-            importSheetsIntoMigrador(process);
-            process.setStatus(MigrationStatus.IMPORTADO_MIGRADOR);
+            importSheetsIntoMigrador(processId);
 
-            for (ProcedureExecutionEntity execution : process.getProcedureExecutions().stream()
-                    .sorted(Comparator.comparingInt(ProcedureExecutionEntity::getStepOrder))
-                    .toList()) {
-                executeProcedureStep(process, execution);
-                if (execution.getStatus() == ProcedureExecutionStatus.FAILED) {
-                    return mapper.toResponse(processRepository.save(process));
+            for (Long executionId : orderedProcedureIds(processId)) {
+                MigrationProcessResponseDTO response = executeProcedureStep(processId, executionId);
+                if (response.status() == MigrationStatus.FALHOU) {
+                    return response;
                 }
             }
 
             String finalStorageUri = databaseFileService.publishFinalDatabase(preparedDatabase);
-            process.setFinalDatabasePath(finalStorageUri);
-            process.setFinalDatabaseFilename(preparedDatabase.finalDatabaseFilename());
-            process.setStatus(MigrationStatus.CONCLUIDO);
-            process.setLastError(null);
-            return mapper.toResponse(processRepository.save(process));
+            return finishFullMigration(processId, preparedDatabase, finalStorageUri);
         } catch (BusinessException exception) {
-            process.setStatus(MigrationStatus.FALHOU);
-            process.setLastError(exception.getMessage());
-            return mapper.toResponse(processRepository.save(process));
+            return failFullMigration(processId, exception.getMessage());
         }
     }
 
     @Transactional
-    public ProcedureExecutionResponseDTO executeProcedure(UUID processId, String procedureName) {
+    public ProcedureExecutionResponseDTO executeProcedure(Long processId, String procedureName) {
         MigrationProcessEntity process = getProcess(processId);
         ProcedureExecutionEntity execution = process.getProcedureExecutions().stream()
                 .filter(item -> item.getProcedureName().equalsIgnoreCase(procedureName))
@@ -271,7 +238,7 @@ public class MigrationProcessService {
     }
 
     @Transactional(readOnly = true)
-    public String errorsCsv(UUID processId, MigrationModule module) {
+    public String errorsCsv(Long processId, MigrationModule module) {
         MigrationSheetEntity sheet = sheetRepository.findByProcessIdAndModule(processId, module)
                 .orElseThrow(() -> new ResourceNotFoundException("Planilha nao encontrada para " + module));
         StringBuilder builder = new StringBuilder("linha,campo,severidade,mensagem\n");
@@ -285,12 +252,12 @@ public class MigrationProcessService {
     }
 
     @Transactional(readOnly = true)
-    public Resource finalDatabaseResource(UUID processId) {
+    public Resource finalDatabaseResource(Long processId) {
         return databaseFileService.finalDatabaseResource(getProcess(processId));
     }
 
     @Transactional(readOnly = true)
-    public String finalDatabaseFilename(UUID processId) {
+    public String finalDatabaseFilename(Long processId) {
         MigrationProcessEntity process = getProcess(processId);
         if (process.getFinalDatabaseFilename() == null || process.getFinalDatabaseFilename().isBlank()) {
             throw new BusinessException("Banco final ainda nao foi gerado.");
@@ -346,6 +313,27 @@ public class MigrationProcessService {
         }
     }
 
+    private MigrationProcessEntity prepareProcessForFullMigration(Long processId) {
+        return transactionTemplate.execute(status -> {
+            MigrationProcessEntity process = getProcess(processId);
+            process.setCleanDatabasePath(cleanDatabaseTemplateService.templateReferenceForVersion(process.getEagleVersion()));
+            validateReadyForFullMigration(process);
+            resetProcedureExecutions(process);
+            process.setFinalDatabasePath(null);
+            process.setFinalDatabaseFilename(null);
+            process.setLastError(null);
+            return processRepository.saveAndFlush(process);
+        });
+    }
+
+    private void storePreparedDatabase(Long processId, PreparedDatabase preparedDatabase) {
+        transactionTemplate.executeWithoutResult(status -> {
+            MigrationProcessEntity process = getProcess(processId);
+            process.setEagleWorkingDatabasePath(preparedDatabase.workingDatabasePath().toString());
+            processRepository.saveAndFlush(process);
+        });
+    }
+
     private void validateReadyForFullMigration(MigrationProcessEntity process) {
         if (process.getSheets().isEmpty()) {
             throw new BusinessException("Envie e valide as planilhas antes de executar a migracao completa.");
@@ -355,39 +343,99 @@ public class MigrationProcessService {
         }
     }
 
-    private void importSheetsIntoMigrador(MigrationProcessEntity process) {
-        for (MigrationSheetEntity sheet : process.getSheets()) {
-            List<Map<String, String>> rows = validRows(sheet);
-            firebirdClient.replaceTable(process.getMigratorDatabase(), sheet.getModule(), layoutRegistry.get(sheet.getModule()), rows);
-            sheet.setImportedAt(OffsetDateTime.now());
-        }
+    private void importSheetsIntoMigrador(Long processId) {
+        transactionTemplate.executeWithoutResult(status -> {
+            MigrationProcessEntity process = getProcess(processId);
+            for (MigrationSheetEntity sheet : process.getSheets()) {
+                List<Map<String, String>> rows = validRows(sheet);
+                firebirdClient.replaceTable(process.getMigratorDatabase(), sheet.getModule(), layoutRegistry.get(sheet.getModule()), rows);
+                sheet.setImportedAt(OffsetDateTime.now());
+            }
+            process.setStatus(MigrationStatus.IMPORTADO_MIGRADOR);
+            process.setLastError(null);
+            processRepository.saveAndFlush(process);
+        });
     }
 
-    private void executeProcedureStep(MigrationProcessEntity process, ProcedureExecutionEntity execution) {
-        if (execution.getStatus() == ProcedureExecutionStatus.SUCCESS
-                && !"CONFIGURAR_MIGRACAO".equalsIgnoreCase(execution.getProcedureName())) {
-            return;
-        }
-        execution.setStatus(ProcedureExecutionStatus.RUNNING);
-        execution.setStartedAt(OffsetDateTime.now());
-        execution.setFinishedAt(null);
-        execution.setErrorMessage(null);
-        process.setStatus(MigrationStatus.PROCEDURES_EM_EXECUCAO);
-        try {
-            if (!shouldExecuteProcedure(process, execution.getProcedureName())) {
-                skipProcedure(execution);
+    private List<Long> orderedProcedureIds(Long processId) {
+        return transactionTemplate.execute(status -> {
+            MigrationProcessEntity process = getProcess(processId);
+            return process.getProcedureExecutions().stream()
+                    .sorted(Comparator.comparingInt(ProcedureExecutionEntity::getStepOrder))
+                    .map(ProcedureExecutionEntity::getId)
+                    .toList();
+        });
+    }
+
+    private MigrationProcessResponseDTO executeProcedureStep(Long processId, Long executionId) {
+        markProcedureRunning(processId, executionId);
+        return transactionTemplate.execute(status -> {
+            MigrationProcessEntity process = getProcess(processId);
+            ProcedureExecutionEntity execution = procedureRepository.findById(executionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Procedure nao encontrada."));
+            try {
+                if (execution.getStatus() == ProcedureExecutionStatus.SUCCESS
+                        && !"CONFIGURAR_MIGRACAO".equalsIgnoreCase(execution.getProcedureName())) {
+                    return mapper.toResponse(process);
+                }
+                if (!shouldExecuteProcedure(process, execution.getProcedureName())) {
+                    skipProcedure(execution);
+                    return mapper.toResponse(processRepository.saveAndFlush(process));
+                }
+                executeFirebirdProcedure(process, execution.getProcedureName());
+                execution.setStatus(ProcedureExecutionStatus.SUCCESS);
+                execution.setFinishedAt(OffsetDateTime.now());
+                return mapper.toResponse(processRepository.saveAndFlush(process));
+            } catch (BusinessException exception) {
+                execution.setStatus(ProcedureExecutionStatus.FAILED);
+                execution.setFinishedAt(OffsetDateTime.now());
+                execution.setErrorMessage(exception.getMessage());
+                process.setStatus(MigrationStatus.FALHOU);
+                process.setLastError(exception.getMessage());
+                return mapper.toResponse(processRepository.saveAndFlush(process));
+            }
+        });
+    }
+
+    private void markProcedureRunning(Long processId, Long executionId) {
+        transactionTemplate.executeWithoutResult(status -> {
+            MigrationProcessEntity process = getProcess(processId);
+            ProcedureExecutionEntity execution = procedureRepository.findById(executionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Procedure nao encontrada."));
+            if (execution.getStatus() == ProcedureExecutionStatus.SUCCESS
+                    && !"CONFIGURAR_MIGRACAO".equalsIgnoreCase(execution.getProcedureName())) {
                 return;
             }
-            executeFirebirdProcedure(process, execution.getProcedureName());
-            execution.setStatus(ProcedureExecutionStatus.SUCCESS);
-            execution.setFinishedAt(OffsetDateTime.now());
-        } catch (BusinessException exception) {
-            execution.setStatus(ProcedureExecutionStatus.FAILED);
-            execution.setFinishedAt(OffsetDateTime.now());
-            execution.setErrorMessage(exception.getMessage());
+            execution.setStatus(ProcedureExecutionStatus.RUNNING);
+            execution.setStartedAt(OffsetDateTime.now());
+            execution.setFinishedAt(null);
+            execution.setErrorMessage(null);
+            process.setStatus(MigrationStatus.PROCEDURES_EM_EXECUCAO);
+            processRepository.saveAndFlush(process);
+        });
+    }
+
+    private MigrationProcessResponseDTO finishFullMigration(
+            Long processId,
+            PreparedDatabase preparedDatabase,
+            String finalStorageUri) {
+        return transactionTemplate.execute(status -> {
+            MigrationProcessEntity process = getProcess(processId);
+            process.setFinalDatabasePath(finalStorageUri);
+            process.setFinalDatabaseFilename(preparedDatabase.finalDatabaseFilename());
+            process.setStatus(MigrationStatus.CONCLUIDO);
+            process.setLastError(null);
+            return mapper.toResponse(processRepository.saveAndFlush(process));
+        });
+    }
+
+    private MigrationProcessResponseDTO failFullMigration(Long processId, String message) {
+        return transactionTemplate.execute(status -> {
+            MigrationProcessEntity process = getProcess(processId);
             process.setStatus(MigrationStatus.FALHOU);
-            process.setLastError(exception.getMessage());
-        }
+            process.setLastError(message);
+            return mapper.toResponse(processRepository.saveAndFlush(process));
+        });
     }
 
     private void resetProcedureExecutions(MigrationProcessEntity process) {
@@ -538,7 +586,7 @@ public class MigrationProcessService {
         return migratorDatabase.trim();
     }
 
-    private MigrationProcessEntity getProcess(UUID processId) {
+    private MigrationProcessEntity getProcess(Long processId) {
         return processRepository.findById(processId)
                 .orElseThrow(() -> new ResourceNotFoundException("Processo de migracao nao encontrado."));
     }

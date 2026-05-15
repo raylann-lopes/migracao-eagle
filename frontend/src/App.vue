@@ -49,6 +49,7 @@ const message = ref('')
 const error = ref('')
 const uploadingModule = ref<MigrationModule | null>(null)
 const operationLabel = ref('')
+const progressPollingId = ref<ReturnType<typeof setInterval> | null>(null)
 
 const form = ref<CreateMigrationProcessRequest>({
   clientName: '',
@@ -136,7 +137,7 @@ async function createProcess() {
   }, true, 'Criando processo')
 }
 
-async function selectProcess(id: string) {
+async function selectProcess(id: number) {
   await run(async () => {
     selected.value = await api.getProcess(id)
     selectedSheet.value = null
@@ -174,8 +175,14 @@ async function importMigrador() {
 
 async function runCompleteMigration() {
   if (!selected.value) return
+  const processId = selected.value.id
   await run(async () => {
-    selected.value = await api.runCompleteMigration(selected.value!.id)
+    startProgressPolling(processId)
+    try {
+      selected.value = await api.runCompleteMigration(processId)
+    } finally {
+      stopProgressPolling()
+    }
     message.value =
       selected.value.status === 'CONCLUIDO'
         ? 'Migracao concluida. Banco final disponivel para download.'
@@ -195,6 +202,24 @@ async function executeNext() {
 async function refreshSelected() {
   if (!selected.value) return
   await selectProcess(selected.value.id)
+}
+
+function startProgressPolling(processId: number) {
+  stopProgressPolling()
+  progressPollingId.value = setInterval(async () => {
+    try {
+      selected.value = await api.getProcess(processId)
+    } catch {
+      // A requisicao principal continua sendo a fonte do erro final da operacao.
+    }
+  }, 1200)
+}
+
+function stopProgressPolling() {
+  if (progressPollingId.value) {
+    clearInterval(progressPollingId.value)
+    progressPollingId.value = null
+  }
 }
 
 async function run(action: () => Promise<void>, showLoading = true, label = 'Processando') {

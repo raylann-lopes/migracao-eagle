@@ -37,6 +37,7 @@ class MigrationDatabaseFileServiceTest {
         properties.getFinalDatabase().getS3().setPrefix("bancos-migrados");
 
         MigrationProcessEntity process = new MigrationProcessEntity();
+        process.setId(1L);
         process.setClientName("Cliente Teste");
         process.setEagleVersion("2025.002");
         process.setCleanDatabasePath("s3://eagle-templates/bancos-limpos/2025.002/EAGLEERP_LIMPO.FDB");

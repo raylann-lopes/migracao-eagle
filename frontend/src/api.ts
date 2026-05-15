@@ -29,7 +29,7 @@ export interface CreateMigrationProcessRequest {
 }
 
 export interface SheetSummary {
-  id: string
+  id: number
   module: MigrationModule
   status: MigrationStatus
   originalFilename: string
@@ -43,7 +43,7 @@ export interface SheetSummary {
 }
 
 export interface ProcedureExecution {
-  id: string
+  id: number
   stepOrder: number
   procedureName: string
   status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'SKIPPED' | 'FAILED'
@@ -53,7 +53,7 @@ export interface ProcedureExecution {
 }
 
 export interface MigrationProcess {
-  id: string
+  id: number
   clientName: string
   cnpj: string | null
   eagleVersion: string
@@ -114,7 +114,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   listProcesses: () => request<MigrationProcess[]>('/api/migration-processes'),
-  getProcess: (id: string) => request<MigrationProcess>(`/api/migration-processes/${id}`),
+  getProcess: (id: number) => request<MigrationProcess>(`/api/migration-processes/${id}`),
   createProcess: (payload: CreateMigrationProcessRequest) =>
     request<MigrationProcess>('/api/migration-processes', {
       method: 'POST',
@@ -123,7 +123,7 @@ export const api = {
     }),
   layouts: () => request<Layout[]>('/api/migration-layouts'),
   cleanDatabaseTemplates: () => request<CleanDatabaseTemplate[]>('/api/clean-database-templates'),
-  uploadSheet: (processId: string, module: MigrationModule, file: File) => {
+  uploadSheet: (processId: number, module: MigrationModule, file: File) => {
     const formData = new FormData()
     formData.append('file', file)
     return request<SheetDetail>(`/api/migration-processes/${processId}/sheets/${module}`, {
@@ -131,12 +131,12 @@ export const api = {
       body: formData,
     })
   },
-  getSheet: (processId: string, module: MigrationModule) =>
+  getSheet: (processId: number, module: MigrationModule) =>
     request<SheetDetail>(`/api/migration-processes/${processId}/sheets/${module}`),
-  importMigrador: (processId: string) =>
+  importMigrador: (processId: number) =>
     request<MigrationProcess>(`/api/migration-processes/${processId}/import-migrador`, { method: 'POST' }),
-  runCompleteMigration: (processId: string) =>
+  runCompleteMigration: (processId: number) =>
     request<MigrationProcess>(`/api/migration-processes/${processId}/run-complete`, { method: 'POST' }),
-  executeNextProcedure: (processId: string) =>
+  executeNextProcedure: (processId: number) =>
     request<ProcedureExecution>(`/api/migration-processes/${processId}/procedures/execute-next`, { method: 'POST' }),
 }

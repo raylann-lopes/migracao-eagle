@@ -23,6 +23,12 @@ Para um passo a passo completo de preparacao do Firebird no Linux, incluindo upl
 docs/firebird-linux-setup.md
 ```
 
+Para configurar o S3 privado aceitando requisicoes somente do servidor da aplicacao, veja:
+
+```text
+docs/s3-server-only-access.md
+```
+
 Antes de subir a stack, prepare a pasta usada pelo Firebird:
 
 ```bash

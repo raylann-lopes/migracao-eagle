@@ -14,7 +14,6 @@ import com.example.demo.migration.service.MigrationProcessService;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -60,25 +59,25 @@ public class MigrationController {
     }
 
     @GetMapping("/migration-processes/{processId}")
-    public MigrationProcessResponseDTO get(@PathVariable UUID processId) {
+    public MigrationProcessResponseDTO get(@PathVariable Long processId) {
         return processService.get(processId);
     }
 
     @PostMapping(value = "/migration-processes/{processId}/sheets/{module}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public SheetDetailResponseDTO uploadSheet(
-            @PathVariable UUID processId,
+            @PathVariable Long processId,
             @PathVariable MigrationModule module,
             @RequestParam("file") MultipartFile file) {
         return processService.uploadSheet(processId, module, file);
     }
 
     @GetMapping("/migration-processes/{processId}/sheets/{module}")
-    public SheetDetailResponseDTO getSheet(@PathVariable UUID processId, @PathVariable MigrationModule module) {
+    public SheetDetailResponseDTO getSheet(@PathVariable Long processId, @PathVariable MigrationModule module) {
         return processService.getSheet(processId, module);
     }
 
     @GetMapping("/migration-processes/{processId}/sheets/{module}/errors.csv")
-    public ResponseEntity<byte[]> errorsCsv(@PathVariable UUID processId, @PathVariable MigrationModule module) {
+    public ResponseEntity<byte[]> errorsCsv(@PathVariable Long processId, @PathVariable MigrationModule module) {
         byte[] body = processService.errorsCsv(processId, module).getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -88,17 +87,17 @@ public class MigrationController {
     }
 
     @PostMapping("/migration-processes/{processId}/import-migrador")
-    public MigrationProcessResponseDTO importMigrador(@PathVariable UUID processId) {
+    public MigrationProcessResponseDTO importMigrador(@PathVariable Long processId) {
         return processService.importValidSheets(processId);
     }
 
     @PostMapping("/migration-processes/{processId}/run-complete")
-    public MigrationProcessResponseDTO runComplete(@PathVariable UUID processId) {
+    public MigrationProcessResponseDTO runComplete(@PathVariable Long processId) {
         return processService.runCompleteMigration(processId);
     }
 
     @GetMapping("/migration-processes/{processId}/final-database")
-    public ResponseEntity<Resource> downloadFinalDatabase(@PathVariable UUID processId) {
+    public ResponseEntity<Resource> downloadFinalDatabase(@PathVariable Long processId) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.attachment().filename(processService.finalDatabaseFilename(processId)).build().toString())
@@ -107,13 +106,13 @@ public class MigrationController {
     }
 
     @PostMapping("/migration-processes/{processId}/procedures/execute-next")
-    public ProcedureExecutionResponseDTO executeNextProcedure(@PathVariable UUID processId) {
+    public ProcedureExecutionResponseDTO executeNextProcedure(@PathVariable Long processId) {
         return processService.executeNextProcedure(processId);
     }
 
     @PostMapping("/migration-processes/{processId}/procedures/{procedureName}/execute")
     public ProcedureExecutionResponseDTO executeProcedure(
-            @PathVariable UUID processId,
+            @PathVariable Long processId,
             @PathVariable String procedureName) {
         return processService.executeProcedure(processId, procedureName);
     }

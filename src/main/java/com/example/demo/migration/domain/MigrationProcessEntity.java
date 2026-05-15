@@ -5,6 +5,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
@@ -13,14 +15,22 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "migration_processes")
 public class MigrationProcessEntity {
 
     @Id
-    private UUID id = UUID.randomUUID();
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column(nullable = false, length = 120)
     private String clientName;
@@ -84,137 +94,5 @@ public class MigrationProcessEntity {
     @PreUpdate
     void preUpdate() {
         updatedAt = OffsetDateTime.now();
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public String getClientName() {
-        return clientName;
-    }
-
-    public void setClientName(String clientName) {
-        this.clientName = clientName;
-    }
-
-    public String getCnpj() {
-        return cnpj;
-    }
-
-    public void setCnpj(String cnpj) {
-        this.cnpj = cnpj;
-    }
-
-    public String getEagleVersion() {
-        return eagleVersion;
-    }
-
-    public void setEagleVersion(String eagleVersion) {
-        this.eagleVersion = eagleVersion;
-    }
-
-    public String getMigratorDatabase() {
-        return migratorDatabase;
-    }
-
-    public void setMigratorDatabase(String migratorDatabase) {
-        this.migratorDatabase = migratorDatabase;
-    }
-
-    public String getCleanDatabasePath() {
-        return cleanDatabasePath;
-    }
-
-    public void setCleanDatabasePath(String cleanDatabasePath) {
-        this.cleanDatabasePath = cleanDatabasePath;
-    }
-
-    public String getEagleWorkingDatabasePath() {
-        return eagleWorkingDatabasePath;
-    }
-
-    public void setEagleWorkingDatabasePath(String eagleWorkingDatabasePath) {
-        this.eagleWorkingDatabasePath = eagleWorkingDatabasePath;
-    }
-
-    public String getFinalDatabasePath() {
-        return finalDatabasePath;
-    }
-
-    public void setFinalDatabasePath(String finalDatabasePath) {
-        this.finalDatabasePath = finalDatabasePath;
-    }
-
-    public String getFinalDatabaseFilename() {
-        return finalDatabaseFilename;
-    }
-
-    public void setFinalDatabaseFilename(String finalDatabaseFilename) {
-        this.finalDatabaseFilename = finalDatabaseFilename;
-    }
-
-    public MigrationStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(MigrationStatus status) {
-        this.status = status;
-    }
-
-    public Integer getDefaultDistrictId() {
-        return defaultDistrictId;
-    }
-
-    public void setDefaultDistrictId(Integer defaultDistrictId) {
-        this.defaultDistrictId = defaultDistrictId;
-    }
-
-    public String getDefaultCep() {
-        return defaultCep;
-    }
-
-    public void setDefaultCep(String defaultCep) {
-        this.defaultCep = defaultCep;
-    }
-
-    public String getCompanyState() {
-        return companyState;
-    }
-
-    public void setCompanyState(String companyState) {
-        this.companyState = companyState;
-    }
-
-    public boolean isMigrateReceivables() {
-        return migrateReceivables;
-    }
-
-    public void setMigrateReceivables(boolean migrateReceivables) {
-        this.migrateReceivables = migrateReceivables;
-    }
-
-    public String getLastError() {
-        return lastError;
-    }
-
-    public void setLastError(String lastError) {
-        this.lastError = lastError;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public List<MigrationSheetEntity> getSheets() {
-        return sheets;
-    }
-
-    public List<ProcedureExecutionEntity> getProcedureExecutions() {
-        return procedureExecutions;
     }
 }
